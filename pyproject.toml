@@ -15,8 +15,6 @@ classifiers = [
     "Topic :: Documentation :: Sphinx",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
-    "Programming Language :: VHDL",
-    "Programming Language :: Verilog",
     "License :: OSI Approved :: MIT License"
 ]
 keywords = ["RTL", "HDL", "VHDL", "Verilog", "symbol", "symbolator", "sphinx"]
