@@ -2,5 +2,5 @@ build
 dist
 *.pyc
 doc/_build
-symbolator.egg-info
+hdltree.egg-info
 _build

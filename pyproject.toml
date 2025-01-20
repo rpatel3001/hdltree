@@ -1,44 +1,56 @@
 [project]
-name = "symbolator"
-version = "1.2.2"
-authors = [{ name = "Kevin Thibedeau", email = "kevin.thibedeau@gmail.com" }]
-maintainers = [{ name = "Zebreus", email = "lennart@madmanfred.com" }]
+name = "hdltree"
+version = "0.0.0"
+authors = [{ name = "Rajan Patel", email = "rpatel3001@gmail.com" }]
 readme = "README.md"
-dependencies =[ "sphinx>=4.3,<5"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: Multimedia :: Graphics",
     "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Documentation",
+    "Topic :: Documentation :: Sphinx",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
+    "Programming Language :: VHDL",
+    "Programming Language :: Verilog",
     "License :: OSI Approved :: MIT License"
 ]
-keywords = ["HDL", "symbol"]
+keywords = ["RTL", "HDL", "VHDL", "Verilog", "symbol", "symbolator", "sphinx"]
 license = { file = "LICENSE" }
-description = "HDL symbol generator"
-requires-python = ">=3.3"
+description = "Pure Python HDL parser, plus symbol generator and sphinx domain"
+requires-python = ">=3.10"
+dependencies =[
+    "lark>=1.0.0",
+    "lark-ambig-tools>=1.0.0",
+    "rich>=13.0.0",
+    "pydot>=3.0.0",
+]
+
+[project.optional-dependencies]
+symbolator = ["pygobject", "pycairo"]
 
 [project.urls]
-Homepage = "https://zebreus.github.io/symbolator"
-source = "https://github.com/zebreus/symbolator"
+source = "https://github.com/rpatel3001/hdltree"
 
 [project.scripts]
 symbolator = "symbolator.__main__:main"
 hdlparse = "hdlparse.__main__:main"
+hdltree = "hdltree.__main__:main"
 
 [build-system]
 requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
-
 
 [tool.setuptools]
 packages = [
     "nucanvas",
     "nucanvas.color",
     "symbolator_sphinx",
+    "hdltree",
     "hdlparse",
     "symbolator"
 ]
-

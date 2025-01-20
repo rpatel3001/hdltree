@@ -1,0 +1,1447 @@
+// initial EBNF from the VHDL-2008 LRM Annex C, formatted version found at
+// https://faculty-web.msoe.edu/johnsontimoj/Common/FILES/VHDL_2008.pdf
+// https://github.com/forflo/yodl/blob/master/newparser/vhdl-2008-ebnf/vhdl-2008.ebnf
+// https://www.sigasi.com/tech/vhdl2008.ebnf
+//
+// PSL items (from the sigasi link) have been commented out
+// The downstream PSL definitions (though the wrong versions) can be found at
+// https://cdn.standards.iteh.ai/samples/16298/ec1cb09f81e9416395593b8ee0c223a9/IEC-62531-2007.pdf
+// https://0x04.net/~mwk/vstd/ieee-1850-2010.pdf
+
+// ignore whitespace and comments
+// Unfortunately the Earley parser in lark cannot add callbacks in the lexer
+// to gather comments and adding them in the grammar itself is untenable.
+// Converting the grammar to be compatible with the LALR parser is impossible.
+
+//%import common.WS
+WS: FORMAT_EFFECTOR
+    | SPACE_CHARACTER
+
+COMMENT: /--.*$/m
+
+BLOCK_COMMENT: /\/\*.*?\*\//s
+
+%ignore WS
+%ignore COMMENT
+%ignore BLOCK_COMMENT
+
+// name tokens to get better error messages in lark
+// adding "_" to keep these tokens from cluttering the tree where possible
+// in some cases they must be preserved for context (e.g. operators)
+// maybe that can be eliminated with "->" aliases
+
+UNDERLINE: "_"
+_SEMICOLON: ";"
+_DOT: "."
+PLUS: "+"
+MINUS: "-"
+AMPERSAND: "&"
+_COMMA: ","
+_COLON: ":"
+_LPAREN: "("
+_RPAREN: ")"
+_LSQUARE: "["
+_RSQUARE: "]"
+_HASH: "#"
+_DQUOTE: "\""
+_SQUOTE: "'"
+_PIPE: "|"
+QMARK: "?"
+CONDITION_OPERATOR: "??"
+_RARROW: "=>"
+_LARROW: "<="
+_WALRUS: ":="
+DIAMOND: "<>"
+_DIAMOND: "<>"
+_DLANGLE: "<<"
+_DRANGLE: ">>"
+EXP: "**"
+_EXP: "**"
+CARET: "^"
+_BACKTICK: "`"
+_BACKSLASH: "\\"
+_E: "E"i
+STAR: "*"
+SLASH: "/"
+_AT: "@"
+EQ: "="
+NE: "/="
+LT: "<"
+LTE: "<="
+GT: ">"
+GTE: ">="
+EQ_M: "?="
+NE_M: "?/="
+LT_M: "?<"
+LTE_M: "?<="
+GT_M: "?>"
+GTE_M: "?>="
+
+// VHDL keywords (LRM 15.10)
+// require a word break before and after
+// adding "_" to keep these tokens out of the tree where possible
+// in some cases they must be preserved for context (e.g. when in an optional group)
+
+ABS: /\babs\b/i
+_ACCESS: /\baccess\b/i
+_AFTER: /\bafter\b/i
+_ALIAS: /\balias\b/i
+ALL: /\ball\b/i
+AND: /\band\b/i
+ARCHITECTURE: /\barchitecture\b/i
+_ARCHITECTURE: /\barchitecture\b/i
+_ARRAY: /\barray\b/i
+_ASSERT: /\bassert\b/i
+//ASSUME: /\bassume\b/i
+//ASSUME_GUARANTEE: /\bassume_guarantee\b/i
+_ATTRIBUTE: /\battribute\b/i
+_BEGIN: /\bbegin\b/i
+_BLOCK: /\bblock\b/i
+_BODY: /\bbody\b/i
+BUFFER: /\bbuffer\b/i
+BUS: /\bbus\b/i
+_CASE: /\bcase\b/i
+_COMPONENT: /\bcomponent\b/i
+_CONFIGURATION: /\bconfiguration\b/i
+CONSTANT: /\bconstant\b/i
+_CONSTANT: /\bconstant\b/i
+_CONTEXT: /\bcontext\b/i
+//COVER: /\bcover\b/i
+DEFAULT: /\bdefault\b/i
+DISCONNECT: /\bdisconnect\b/i
+DOWNTO: /\bdownto\b/i
+_ELSE: /\belse\b/i
+_ELSIF: /\belsif\b/i
+_END: /\bEND\b/i
+ENTITY: /\bentity\b/i
+_ENTITY: /\bentity\b/i
+_EXIT: /\bexit\b/i
+//FAIRNESS: /\bfairness\b/i
+_FILE: /\bfile\b/i
+_FOR: /\bfor\b/i
+_FORCE: /\bforce\b/i
+_FUNCTION: /\bfunction\b/i
+_GENERATE: /\bgenerate\b/i
+_GENERIC: /\bgeneric\b/i
+_GROUP: /\bgroup\b/i
+GUARDED: /\bguarded\b/i
+_IF: /\bif\b/i
+IMPURE: /\bimpure\b/i
+IN: /\bin\b/i
+_IN: /\bin\b/i
+INERTIAL: /\binertial\b/i
+INOUT: /\binout\b/i
+IS: /\bis\b/i
+_IS: /\bis\b/i
+//LABEL: /\blabel\b/i
+_LIBRARY: /\blibrary\b/i
+LINKAGE: /\blinkage\b/i
+//LITERAL: /\bliteral\b/i
+_LOOP: /\bloop\b/i
+_MAP: /\bmap\b/i
+MOD: /\bmod\b/i
+NAND: /\bnand\b/i
+_NEW: /\bnew\b/i
+_NEXT: /\bnext\b/i
+NOR: /\bnor\b/i
+NOT: /\bnot\b/i
+NULL: /\bnull\b/i
+_OF: /\bof\b/i
+_ON: /\bon\b/i
+OPEN: /\bopen\b/i
+_OPEN: /\bopen\b/i
+OR: /\bor\b/i
+OTHERS: /\bothers\b/i
+OUT: /\bout\b/i
+PACKAGE: /\bpackage\b/i
+_PACKAGE: /\bpackage\b/i
+PARAMETER: /\bparameter\b/i
+_PORT: /\bport\b/i
+POSTPONED: /\bpostponed\b/i
+_PROCEDURE: /\bprocedure\b/i
+_PROCESS: /\bprocess\b/i
+//PROPERTY: /\bproperty\b/i
+_PROTECTED: /\bprotected\b/i
+PURE: /\bpure\b/i
+_RANGE: /\brange\b/i
+_RECORD: /\brecord\b/i
+REGISTER: /\bregister\b/i
+_REJECT: /\breject\b/i
+_RELEASE: /\brelease\b/i
+REM: /\brem\b/i
+_REPORT: /\breport\b/i
+//RESTRICT: /\brestrict\b/i
+//RESTRICT_GUARANTEE: /\brestrict_guarantee\b/i
+_RETURN: /\breturn\b/i
+ROL: /\brol\b/i
+ROR: /\bror\b/i
+_SELECT: /\bselect\b/i
+//SEQUENCE: /\bsequence\b/i
+_SEVERITY: /\bseverity\b/i
+SIGNAL: /\bsignal\b/i
+_SIGNAL: /\bsignal\b/i
+SHARED: /\bshared\b/i
+SLA: /\bsla\b/i
+SLL: /\bsll\b/i
+SRA: /\bsra\b/i
+SRL: /\bsrl\b/i
+//STRONG: /\bstrong\b/i
+_SUBTYPE: /\bsubtype\b/i
+_THEN: /\bthen\b/i
+TO: /\bto\b/i
+TRANSPORT: /\btransport\b/i
+_TYPE: /\btype\b/i
+UNAFFECTED: /\bunaffected\b/i
+_UNITS: /\bunits\b/i
+_UNTIL: /\buntil\b/i
+_USE: /\buse\b/i
+VARIABLE: /\bvariable\b/i
+_VARIABLE: /\bvariable\b/i
+//VMODE: /\bvmode\b/i
+//VPROP: /\bvprop\b/i
+VUNIT: /\bvunit\b/i
+_WAIT: /\bwait\b/i
+_WHEN: /\bwhen\b/i
+_WHILE: /\bwhile\b/i
+_WITH: /\bwith\b/i
+XNOR: /\bxnor\b/i
+XOR: /\bxor\b/i
+
+// types aliases not explicitly defined in the LRM, denoted in the LRM as italic prefixes
+
+?generic_association_list: association_list
+?parameter_association_list: association_list
+?port_association_list: association_list
+?component_instantiation_label: instantiation_label
+?guarded_signal_list: signal_list
+?passive_concurrent_procedure_call_statement: concurrent_procedure_call_statement
+?guard_condition: condition
+?static_discrete_range: discrete_range
+//?file_open_kind_expression: expression
+?static_expression: expression
+?string_expression: expression
+?time_expression: expression
+?value_expression: expression
+?alternative_label: label
+?block_label: label
+?block_statement_label: label
+?case_label: label
+?generate_label: label
+?generate_statement_label: label
+?if_label: label
+?instantiation_label: label
+?loop_label: label
+?process_label: label
+?range_attribute_name: attribute_name
+?library_logical_name: logical_name
+?architecture_simple_name: _simple_name
+?attribute_simple_name: _simple_name
+?component_simple_name: _simple_name
+?configuration_simple_name: _simple_name
+?context_simple_name: _simple_name
+?element_simple_name: _simple_name
+?entity_simple_name: _simple_name
+?object_simple_name: _simple_name
+?package_simple_name: _simple_name
+?physical_type_simple_name: _simple_name
+?protected_type_simple_name: _simple_name
+?record_element_simple_name: _simple_name
+?record_type_simple_name: _simple_name
+?architecture_name: name
+?component_name: name
+?configuration_name: name
+?entity_name: name
+?file_name: name
+?function_name: name
+?resolution_function_name: name
+?generic_name: name
+?group_template_name: name
+?instantiated_package_name: name
+?parameter_name: name
+?port_name: name
+?procedure_name: name
+?signal_name: name
+?subprogram_name: name
+?subtype_name: name
+?type_name: name
+?uninstantiated_subprogram_name: name
+?variable_name: name
+?verification_unit_name: name
+?architecture_identifier: identifier
+?discrete_subtype_indication: subtype_indication
+?element_subtype_indication: subtype_indication
+?formal_generic_clause: generic_clause
+?local_generic_clause: generic_clause
+?uninstantiated_package_name: name
+?generate_parameter_specification: parameter_specification
+?loop_parameter_specification: parameter_specification
+?formal_port_clause: port_clause
+?local_port_clause: port_clause
+?passive_process_statement: process_statement
+?shared_variable_declaration: variable_declaration
+
+// the rest of the file is directly from the VHDL 2008 LRM,
+// after being formatted to match the lark grammar syntax and
+// being slightly modified based on the semantic rules therein
+
+absolute_pathname: _DOT partial_pathname
+
+abstract_literal: decimal_literal | based_literal
+
+access_type_definition: _ACCESS subtype_indication
+
+actual_designator: [ INERTIAL ] expression
+    | signal_name
+    | variable_name
+    | file_name
+    | subtype_indication
+    | subprogram_name
+    | instantiated_package_name
+    | OPEN
+
+?actual_parameter_part: parameter_association_list
+
+actual_part: actual_designator
+    | function_name _LPAREN actual_designator _RPAREN
+    | type_mark _LPAREN actual_designator _RPAREN
+
+ADDING_OPERATOR: PLUS
+    | MINUS
+    | AMPERSAND
+
+aggregate: _LPAREN [ element_association (_COMMA element_association )* ] _RPAREN
+
+alias_declaration: _ALIAS alias_designator [ _COLON subtype_indication ] _IS name [ signature ] _SEMICOLON
+
+alias_designator: identifier
+    | character_literal
+    | OPERATOR_SYMBOL
+
+allocator: _NEW subtype_indication
+    | _NEW qualified_expression
+
+architecture_body: _ARCHITECTURE identifier _OF entity_name _IS architecture_declarative_part _BEGIN architecture_statement_part _END [ ARCHITECTURE ] [ architecture_simple_name ] _SEMICOLON
+
+architecture_declarative_part: ( block_declarative_item )* -> as_list
+
+architecture_statement_part: ( concurrent_statement )* -> as_list
+
+array_constraint: index_constraint [ array_element_constraint ]
+    | _LPAREN OPEN _RPAREN [ array_element_constraint ]
+
+array_element_constraint: _element_constraint
+
+_array_element_resolution: resolution_indication
+
+array_type_definition: unbounded_array_definition
+    | constrained_array_definition
+
+// severity level is limited to a predefined enum (LRM 10.3, LRM 16.3)
+NOTE: "NOTE"i
+WARNING: "WARNING"i
+ERROR: "ERROR"i
+FAILURE: "FAILURE"i
+SEVERITY_LEVEL: NOTE
+    | WARNING
+    | ERROR
+    | FAILURE
+assertion: _ASSERT condition [ _REPORT expression ] [ _SEVERITY SEVERITY_LEVEL ]
+
+assertion_statement: [ label _COLON ] assertion _SEMICOLON
+
+association_element: [ formal_part _RARROW ] actual_part
+
+?association_list: association_element ( _COMMA association_element )* -> as_list
+
+attribute_declaration: _ATTRIBUTE identifier _COLON type_mark _SEMICOLON
+
+?attribute_designator: attribute_simple_name
+
+attribute_name: prefix [ signature ] _SQUOTE attribute_designator [ _LPAREN expression _RPAREN ]
+
+attribute_specification: _ATTRIBUTE attribute_designator _OF entity_specification _IS expression _SEMICOLON
+
+// add word breaks before and after
+BASIC_IDENTIFIER: /\b/ LETTER ( [ UNDERLINE ] LETTER_OR_DIGIT )* /\b/
+
+binding_indication: [ _USE entity_aspect ] [ generic_map_aspect ] [ port_map_aspect ]
+
+// was BASE: INTEGER, but it must be 2 to 16 (LRM 15.5.3)
+BASE: /([2-9]|1[0-6])/
+
+BASE_SPECIFIER_BIN: "B"i
+    | "UB"i
+    | "SB"i
+BASE_SPECIFIER_OCT: "O"i
+    | "UO"i
+    | "SO"i
+BASE_SPECIFIER_HEX: "X"i
+    | "UX"i
+    | "SX"i
+BASE_SPECIFIER_DEC: "D"i
+
+BASED_INTEGER: EXTENDED_DIGIT ( [ UNDERLINE ] EXTENDED_DIGIT )*
+
+// split bit value and bit string literal for specificity based on LRM (15.8)
+based_literal: BASE _HASH BASED_INTEGER [ _DOT BASED_INTEGER ] _HASH [ exponent ]
+
+//BIT_VALUE: GRAPHIC_CHARACTER ( [ UNDERLINE ] GRAPHIC_CHARACTER )*
+BIT_VALUE_BIN: /[01]/ ( [ UNDERLINE ] /[01]/ )*
+BIT_VALUE_OCT: /[0-7]/ ( [ UNDERLINE ] /[0-7]/ )*
+BIT_VALUE_HEX: EXTENDED_DIGIT ( [ UNDERLINE ] EXTENDED_DIGIT )*
+BIT_VALUE_DEC: DIGIT ( [ UNDERLINE ] DIGIT )*
+
+_bit_string_literal_bin: [ INTEGER ] BASE_SPECIFIER_BIN _DQUOTE [ BIT_VALUE_BIN ] _DQUOTE
+_bit_string_literal_oct: [ INTEGER ] BASE_SPECIFIER_OCT _DQUOTE [ BIT_VALUE_OCT ] _DQUOTE
+_bit_string_literal_hex: [ INTEGER ] BASE_SPECIFIER_HEX _DQUOTE [ BIT_VALUE_HEX ] _DQUOTE
+_bit_string_literal_dec: [ INTEGER ] BASE_SPECIFIER_DEC _DQUOTE [ BIT_VALUE_DEC ] _DQUOTE
+
+bit_string_literal: _bit_string_literal_bin
+    | _bit_string_literal_oct
+    | _bit_string_literal_hex
+    | _bit_string_literal_dec
+
+// pull out lists
+use_clause_list: ( use_clause )* -> as_list
+configuration_item_list: ( configuration_item )* -> as_list
+block_configuration: _FOR block_specification use_clause_list configuration_item_list _END _FOR _SEMICOLON
+
+block_declarative_item: subprogram_declaration
+    | subprogram_body
+    | subprogram_instantiation_declaration
+    | package_declaration
+    | package_body
+    | package_instantiation_declaration
+    | type_declaration
+    | subtype_declaration
+    | constant_declaration
+    | signal_declaration
+    | shared_variable_declaration
+    | file_declaration
+    | alias_declaration
+    | component_declaration
+    | attribute_declaration
+    | attribute_specification
+    | configuration_specification
+    | disconnection_specification
+    | use_clause
+    | group_template_declaration
+    | group_declaration
+//    | PSL_Property_Declaration
+//    | PSL_Sequence_Declaration
+//    | PSL_Clock_Declaration
+
+block_declarative_part: ( block_declarative_item )* -> as_list
+
+block_header: [ generic_clause [ generic_map_aspect _SEMICOLON ] ] [ port_clause [ port_map_aspect _SEMICOLON ] ]
+
+block_specification: architecture_name
+    | block_statement_label
+    | generate_statement_label [ _LPAREN generate_specification _RPAREN ]
+
+block_statement: block_label _COLON _BLOCK [ _LPAREN guard_condition _RPAREN ] [ IS ] block_header block_declarative_part _BEGIN block_statement_part _END _BLOCK [ block_label ] _SEMICOLON
+
+block_statement_part: ( concurrent_statement )* -> as_list
+
+case_generate_alternative: _WHEN [ alternative_label _COLON ] choices _RARROW generate_statement_body
+
+// pull out list
+case_generate_alternative_list: case_generate_alternative+ -> as_list
+case_generate_statement: generate_label _COLON _CASE expression _GENERATE case_generate_alternative_list _END _GENERATE [ generate_label ] _SEMICOLON
+
+// pull out list
+case_statement_alternative_list: case_statement_alternative+ -> as_list
+case_statement: [ case_label _COLON ] _CASE [ QMARK ] expression _IS case_statement_alternative_list _END _CASE [ QMARK ] [ case_label ] _SEMICOLON
+
+case_statement_alternative: _WHEN choices _RARROW sequence_of_statements
+
+character_literal: _SQUOTE GRAPHIC_CHARACTER _SQUOTE
+
+choice: simple_expression
+    | discrete_range
+    | element_simple_name
+    | OTHERS
+
+choices: choice ( _PIPE choice)*
+
+component_configuration: _FOR component_specification [ binding_indication _SEMICOLON ] ( verification_unit_binding_indication _SEMICOLON )* [ block_configuration ] _END _FOR _SEMICOLON
+
+component_declaration: _COMPONENT identifier [ IS ] [ local_generic_clause ] [ local_port_clause ] _END _COMPONENT [ component_simple_name ] _SEMICOLON
+
+component_instantiation_statement: instantiation_label _COLON instantiated_unit [ generic_map_aspect ] [ port_map_aspect ] _SEMICOLON
+
+component_specification: instantiation_list _COLON component_name
+
+composite_type_definition: array_type_definition
+    | record_type_definition
+
+compound_configuration_specification: _FOR component_specification binding_indication _SEMICOLON verification_unit_binding_indication _SEMICOLON ( verification_unit_binding_indication _SEMICOLON )* _END _FOR _SEMICOLON
+
+concurrent_assertion_statement: [ label _COLON ] [ POSTPONED ] assertion _SEMICOLON
+
+concurrent_conditional_signal_assignment: target _LARROW [ GUARDED ] [ delay_mechanism ] conditional_waveforms _SEMICOLON
+
+concurrent_procedure_call_statement: [ label _COLON ] [ POSTPONED ] procedure_call _SEMICOLON
+
+concurrent_selected_signal_assignment: _WITH expression _SELECT [ QMARK ] target _LARROW [ GUARDED ] [ delay_mechanism ] selected_waveforms _SEMICOLON
+
+concurrent_signal_assignment_statement: [ label _COLON ] [ POSTPONED ] concurrent_simple_signal_assignment
+    | [ label _COLON ] [ POSTPONED ] concurrent_conditional_signal_assignment
+    | [ label _COLON ] [ POSTPONED ] concurrent_selected_signal_assignment
+
+concurrent_simple_signal_assignment: target _LARROW [ GUARDED ] [ delay_mechanism ] waveform _SEMICOLON
+
+concurrent_statement: block_statement
+    | process_statement
+    | concurrent_procedure_call_statement
+    | concurrent_assertion_statement
+    | concurrent_signal_assignment_statement
+    | component_instantiation_statement
+    | generate_statement
+//    | PSL_Directive
+
+?condition: expression
+
+condition_clause: _UNTIL condition
+
+conditional_expression: expression _WHEN condition ( _ELSE expression _WHEN condition )* [ _ELSE expression ]
+
+conditional_force_assignment: target _LARROW _FORCE [ force_mode ] conditional_expression _SEMICOLON
+
+conditional_signal_assignment: conditional_waveform_assignment
+    | conditional_force_assignment
+
+conditional_variable_assignment: target _WALRUS conditional_expression _SEMICOLON
+
+conditional_waveform_assignment: target _LARROW [ delay_mechanism ] conditional_waveforms _SEMICOLON
+
+// pull out list
+conditional_waveforms_elses: ( _ELSE waveform _WHEN condition )* -> as_list
+conditional_waveforms: waveform _WHEN condition conditional_waveforms_elses [ _ELSE waveform ]
+
+configuration_declaration: _CONFIGURATION identifier _OF entity_name _IS configuration_declarative_part ( verification_unit_binding_indication _SEMICOLON )* block_configuration _END [ _CONFIGURATION ] [ configuration_simple_name ] _SEMICOLON
+
+configuration_declarative_item: use_clause
+    | attribute_specification
+    | group_declaration
+
+configuration_declarative_part: ( configuration_declarative_item )* -> as_list
+
+configuration_item: block_configuration
+    | component_configuration
+
+configuration_specification: simple_configuration_specification
+    | compound_configuration_specification
+
+constant_declaration: _CONSTANT identifier_list _COLON subtype_indication [ _WALRUS expression ] _SEMICOLON
+
+constrained_array_definition: _ARRAY index_constraint _OF element_subtype_indication
+
+constraint: range_constraint
+    | array_constraint
+    | record_constraint
+
+context_clause: ( context_item )*
+
+context_declaration: _CONTEXT identifier _IS context_clause _END [ _CONTEXT ] [ context_simple_name ] _SEMICOLON
+
+context_item: library_clause
+    | use_clause
+    | context_reference
+
+context_reference: _CONTEXT selected_name ( _COMMA selected_name )* _SEMICOLON -> as_list
+
+decimal_literal: INTEGER [ _DOT INTEGER ] [ exponent ]
+
+delay_mechanism: TRANSPORT
+    | [ _REJECT time_expression ] INERTIAL
+
+design_file: design_unit+
+
+design_unit: context_clause library_unit
+
+designator: identifier
+    | OPERATOR_SYMBOL
+
+DIRECTION: TO | DOWNTO
+
+disconnection_specification: DISCONNECT guarded_signal_specification _AFTER time_expression _SEMICOLON
+
+discrete_range: discrete_subtype_indication
+    | range
+
+element_association: [ choices _RARROW ] expression
+
+_element_constraint: array_constraint
+    | record_constraint
+
+element_declaration: identifier_list _COLON _element_subtype_definition _SEMICOLON
+
+element_resolution: _array_element_resolution
+    | record_resolution
+
+_element_subtype_definition: subtype_indication
+
+entity_aspect: _ENTITY entity_name [ _LPAREN architecture_identifier _RPAREN ]
+    | _CONFIGURATION configuration_name
+    | OPEN
+
+!entity_class: ENTITY
+    | ARCHITECTURE
+    | _CONFIGURATION
+    | _PROCEDURE
+    | _FUNCTION
+    | PACKAGE
+    | _TYPE
+    | _SUBTYPE
+    | CONSTANT
+    | SIGNAL
+    | VARIABLE
+    | _COMPONENT
+//    | LABEL
+//    | LITERAL
+    | _UNITS
+    | _GROUP
+    | _FILE
+//    | PROPERTY
+//    | SEQUENCE
+
+entity_class_entry: entity_class [ DIAMOND ]
+
+entity_class_entry_list: entity_class_entry ( _COMMA entity_class_entry )* -> as_list
+
+entity_declaration: _ENTITY identifier _IS entity_header entity_declarative_part [ _BEGIN entity_statement_part ] _END [ ENTITY ] [ entity_simple_name ] _SEMICOLON
+
+entity_declarative_item: subprogram_declaration
+    | subprogram_body
+    | subprogram_instantiation_declaration
+    | package_declaration
+    | package_body
+    | package_instantiation_declaration
+    | type_declaration
+    | subtype_declaration
+    | constant_declaration
+    | signal_declaration
+    | shared_variable_declaration
+    | file_declaration
+    | alias_declaration
+    | attribute_declaration
+    | attribute_specification
+    | disconnection_specification
+    | use_clause
+    | group_template_declaration
+    | group_declaration
+//    | PSL_Property_Declaration
+//    | PSL_Sequence_Declaration
+//    | PSL_Clock_Declaration
+
+entity_declarative_part: ( entity_declarative_item )* -> as_list
+
+entity_designator: entity_tag [ signature ]
+
+entity_header: [ formal_generic_clause ] [ formal_port_clause ]
+
+entity_name_list: entity_designator ( _COMMA entity_designator )* -> as_list
+    | OTHERS
+    | ALL
+
+entity_specification: entity_name_list _COLON entity_class
+
+entity_statement: concurrent_assertion_statement
+    | passive_concurrent_procedure_call_statement
+    | passive_process_statement
+//    | PSL_Directive
+
+entity_statement_part: ( entity_statement )*
+
+entity_tag: _simple_name
+    | character_literal
+    | OPERATOR_SYMBOL
+
+enumeration_literal: identifier
+    | character_literal
+
+enumeration_type_definition: _LPAREN enumeration_literal ( _COMMA enumeration_literal )* _RPAREN
+
+exit_statement: [ label _COLON ] _EXIT [ loop_label ] [ _WHEN condition ] _SEMICOLON
+
+exponent: _E [ PLUS ] INTEGER
+    | _E MINUS INTEGER
+
+expression: CONDITION_OPERATOR primary
+    | logical_expression
+
+// second branch was LETTER, but we only need A-F (LRM 15.5.3)
+HEX_LETTER: /[a-f]/i
+EXTENDED_DIGIT: DIGIT
+    | HEX_LETTER
+
+extended_identifier: _BACKSLASH GRAPHIC_STRING _BACKSLASH
+
+external_name: external_constant_name
+    | external_signal_name
+    | external_variable_name
+
+external_constant_name: _DLANGLE _CONSTANT external_pathname _COLON subtype_indication _DRANGLE
+
+external_signal_name: _DLANGLE _SIGNAL external_pathname _COLON subtype_indication _DRANGLE
+
+external_variable_name: _DLANGLE _VARIABLE external_pathname _COLON subtype_indication _DRANGLE
+
+external_pathname: package_pathname
+    | absolute_pathname
+    | relative_pathname
+
+factor: primary [ _EXP primary ]
+    | ABS primary
+    | NOT primary
+    | LOGICAL_OPERATOR primary
+
+file_declaration: _FILE identifier_list _COLON subtype_indication [ file_open_information ] _SEMICOLON
+
+?file_logical_name: string_expression
+
+// replace file_open_kind_expression with a limited list of options defined in STD.STANDARD (LRM 6.4.2.5, LRM 16.3)
+//file_open_information: [ _OPEN file_open_kind_expression ] _IS file_logical_name
+file_open_information: [ _OPEN FILE_OPEN_KIND_EXPRESSION ] _IS file_logical_name
+
+FILE_OPEN_KIND_EXPRESSION: "READ_MODE"i
+    | "WRITE_MODE"i
+    | "APPEND_MODE"i
+
+file_type_definition: _FILE _OF type_mark
+
+floating_type_definition: range_constraint
+
+for_generate_statement: generate_label _COLON _FOR generate_parameter_specification _GENERATE generate_statement_body _END _GENERATE [ generate_label ] _SEMICOLON
+
+!force_mode: IN
+    | OUT
+
+_formal_designator: generic_name
+    | port_name
+    | parameter_name
+
+?formal_parameter_list: parameter_interface_list
+
+formal_part: _formal_designator
+    | function_name _LPAREN _formal_designator _RPAREN
+    | type_mark _LPAREN _formal_designator _RPAREN
+
+full_type_declaration: _TYPE identifier _IS type_definition _SEMICOLON
+
+function_call: function_name [ _LPAREN actual_parameter_part _RPAREN ]
+
+function_specification: [ PURE | IMPURE ] _FUNCTION designator [ subprogram_header ] [ [ PARAMETER ] _LPAREN formal_parameter_list _RPAREN ] _RETURN type_mark
+
+generate_specification: static_discrete_range
+    | static_expression
+    | alternative_label
+
+generate_statement: for_generate_statement
+    | if_generate_statement
+    | case_generate_statement
+
+generate_statement_body: [ block_declarative_part _BEGIN ] block_statement_part [ _END [ alternative_label ] _SEMICOLON ]
+
+generic_clause: _GENERIC _LPAREN _generic_list _RPAREN _SEMICOLON
+
+_generic_list: _generic_interface_list
+
+generic_map_aspect: _GENERIC _MAP _LPAREN generic_association_list _RPAREN
+
+// not actually used anywhere
+//BASIC_CHARACTER: BASIC_GRAPHIC_CHARACTER | FORMAT_EFFECTOR
+
+// only used in one place (right below), so inlined
+//BASIC_GRAPHIC_CHARACTER: UPPER_CASE_LETTER
+//    | DIGIT
+//    | SPECIAL_CHARACTER
+//    | SPACE_CHARACTER
+
+GRAPHIC_CHARACTER: UPPER_CASE_LETTER
+    | DIGIT
+    | SPECIAL_CHARACTER
+    | SPACE_CHARACTER
+    | LOWER_CASE_LETTER
+    | OTHER_SPECIAL_CHARACTER
+
+ESCAPED_GRAPHIC_CHARACTER: UPPER_CASE_LETTER
+    | DIGIT
+    | SPACE_CHARACTER
+    | ESCAPED_SPECIAL_CHARACTER
+    | LOWER_CASE_LETTER
+    | OTHER_SPECIAL_CHARACTER
+
+// add this helper so various higher level productions can be rules instead of terminals
+GRAPHIC_STRING: GRAPHIC_CHARACTER+
+ESCAPED_GRAPHIC_STRING: ESCAPED_GRAPHIC_CHARACTER+
+
+group_constituent: name
+    | character_literal
+
+group_constituent_list: group_constituent ( _COMMA group_constituent )*
+
+group_declaration: _GROUP identifier _COLON group_template_name _LPAREN group_constituent_list _RPAREN _SEMICOLON
+
+group_template_declaration: _GROUP identifier _IS _LPAREN entity_class_entry_list _RPAREN _SEMICOLON
+
+guarded_signal_specification: guarded_signal_list _COLON type_mark
+
+identifier: BASIC_IDENTIFIER
+    | extended_identifier
+
+identifier_list: identifier ( _COMMA identifier )* -> as_list
+
+if_generate_statement: generate_label _COLON _IF [ alternative_label _COLON ] condition _GENERATE generate_statement_body ( _ELSIF [ alternative_label _COLON ] condition _GENERATE generate_statement_body )* [ _ELSE [ alternative_label _COLON ] _GENERATE generate_statement_body ] _END _GENERATE [ generate_label ] _SEMICOLON
+
+// pull out list
+elsif_list: ( _ELSIF condition _THEN sequence_of_statements )* -> as_list
+if_statement: [ if_label _COLON ] _IF condition _THEN sequence_of_statements elsif_list [ _ELSE sequence_of_statements ] _END _IF [ if_label ] _SEMICOLON
+
+incomplete_type_declaration: _TYPE identifier _SEMICOLON
+
+index_constraint: _LPAREN discrete_range ( _COMMA discrete_range )* _RPAREN
+
+index_subtype_definition: type_mark _RANGE _DIAMOND
+
+// pull out list
+expression_list: expression ( _COMMA expression )* -> as_list
+indexed_name: prefix _LPAREN [ expression_list ] _RPAREN
+
+instantiated_unit: [ _COMPONENT ] component_name -> instantiated_component
+    | _ENTITY entity_name [ _LPAREN architecture_identifier _RPAREN ] -> instantiated_entity
+    | _CONFIGURATION configuration_name -> instantiated_configuration
+
+instantiation_list: instantiation_label ( _COMMA instantiation_label )*
+    | OTHERS
+    | ALL
+
+INTEGER: DIGIT ( [ UNDERLINE ] DIGIT )*
+
+integer_type_definition: range_constraint
+
+interface_constant_declaration: [ CONSTANT ] identifier_list _COLON [ IN ] subtype_indication [ _WALRUS static_expression ]
+
+interface_file_declaration: _FILE identifier_list _COLON subtype_indication
+
+interface_function_specification: [ PURE | IMPURE ] _FUNCTION designator [ [ PARAMETER ] _LPAREN formal_parameter_list _RPAREN ] _RETURN type_mark
+
+interface_incomplete_type_declaration: _TYPE identifier
+
+// used to be the following, but not all interface_elements are valid for each interface_list type (LRM 6.5.6.1)
+//_interface_object_declaration: interface_constant_declaration
+//    | interface_signal_declaration
+//    | interface_variable_declaration
+//    | interface_file_declaration
+//_interface_declaration: _interface_object_declaration
+//    | interface_type_declaration
+//    | interface_subprogram_declaration
+//    | interface_package_declaration
+//interface_element: _interface_declaration
+//_interface_list: interface_element ( _SEMICOLON interface_element )*
+//_generic_interface_list: _interface_list
+//_parameter_interface_list: _interface_list
+//_port_interface_list: _interface_list
+
+_generic_interface_declaration: interface_constant_declaration
+    | interface_type_declaration
+    | interface_subprogram_declaration
+    | interface_package_declaration
+
+generic_interface_element: _generic_interface_declaration
+
+_generic_interface_list: generic_interface_element ( _SEMICOLON generic_interface_element )*
+
+_parameter_interface_declaration: interface_constant_declaration
+    | interface_signal_declaration
+    | interface_variable_declaration
+    | interface_file_declaration
+
+parameter_interface_element: _parameter_interface_declaration
+
+parameter_interface_list: parameter_interface_element ( _SEMICOLON parameter_interface_element )* -> as_list
+
+_port_interface_declaration: interface_signal_declaration
+
+port_interface_element: _port_interface_declaration
+
+_port_interface_list: port_interface_element ( _SEMICOLON port_interface_element )*
+
+interface_package_declaration: _PACKAGE identifier _IS _NEW uninstantiated_package_name interface_package_generic_map_aspect
+
+interface_package_generic_map_aspect: generic_map_aspect
+    | _GENERIC _MAP _LPAREN DIAMOND _RPAREN
+    | _GENERIC _MAP _LPAREN DEFAULT _RPAREN
+
+interface_procedure_specification: _PROCEDURE designator [ [ PARAMETER ] _LPAREN formal_parameter_list _RPAREN ]
+
+interface_signal_declaration: [ SIGNAL ] identifier_list _COLON [ MODE ] subtype_indication [ BUS ] [ _WALRUS static_expression ]
+
+interface_subprogram_declaration: interface_subprogram_specification [ _IS interface_subprogram_default ]
+
+interface_subprogram_default: subprogram_name
+    | DIAMOND
+
+interface_subprogram_specification: interface_procedure_specification
+    | interface_function_specification
+
+?interface_type_declaration: interface_incomplete_type_declaration
+
+interface_variable_declaration: [ VARIABLE ] identifier_list _COLON [ MODE ] subtype_indication [ _WALRUS static_expression ]
+
+iteration_scheme: _WHILE condition
+    | _FOR loop_parameter_specification
+
+?label: identifier
+
+LETTER: UPPER_CASE_LETTER
+    | LOWER_CASE_LETTER
+
+LETTER_OR_DIGIT: LETTER
+    | DIGIT
+
+library_clause: _LIBRARY _logical_name_list _SEMICOLON
+
+library_unit: primary_unit
+    | secondary_unit
+
+literal: numeric_literal
+    | enumeration_literal
+    | string_literal
+    | bit_string_literal
+    | NULL
+
+logical_expression: relation ( AND relation )*
+    | relation ( OR relation )*
+    | relation ( XOR relation )*
+    | relation ( NAND relation )*
+    | relation ( NOR relation )*
+    | relation ( XNOR relation )*
+
+logical_name: identifier
+
+_logical_name_list: logical_name ( _COMMA logical_name )*
+
+LOGICAL_OPERATOR: AND
+    | OR
+    | NAND
+    | NOR
+    | XOR
+    | XNOR
+
+loop_statement: [ loop_label _COLON ] [ iteration_scheme ] _LOOP sequence_of_statements _END _LOOP [ loop_label ] _SEMICOLON
+
+MISCELLANEOUS_OPERATOR: EXP
+    | ABS
+    | NOT
+
+MODE: IN
+    | OUT
+    | INOUT
+    | BUFFER
+    | LINKAGE
+
+MULTIPLYING_OPERATOR: STAR
+    | SLASH
+    | MOD
+    | REM
+
+name: _simple_name
+    | OPERATOR_SYMBOL
+    | character_literal
+    | selected_name
+    | indexed_name
+    | slice_name
+    | attribute_name
+    | external_name
+
+next_statement: [ label _COLON ] _NEXT [ loop_label ] [ _WHEN condition ] _SEMICOLON
+
+null_statement: [ label _COLON ] NULL _SEMICOLON
+
+numeric_literal: abstract_literal
+    | physical_literal
+
+object_declaration: constant_declaration
+    | signal_declaration
+    | variable_declaration
+    | file_declaration
+
+// was string_literal but only predefined operators are allowed (LRM 4.2.1)
+OPERATOR_SYMBOL: _DQUOTE OPERATOR_SYMBOL_INNER _DQUOTE
+OPERATOR_SYMBOL_INNER: CONDITION_OPERATOR
+    | LOGICAL_OPERATOR
+    | RELATIONAL_OPERATOR
+    | SHIFT_OPERATOR
+    | ADDING_OPERATOR
+//    | SIGN
+    | MULTIPLYING_OPERATOR
+    | MISCELLANEOUS_OPERATOR
+
+package_body: _PACKAGE _BODY package_simple_name _IS package_body_declarative_part _END [ PACKAGE _BODY ] [ package_simple_name ] _SEMICOLON
+
+// make generic declarative_item to replace
+// package_body_declarative_item
+// process_declarative_item
+// protected_type_body_declarative_item
+// subprogram_declarative_item
+// ***package_declarative_item and some others are slightly different and not included!***
+declarative_item: subprogram_declaration
+    | subprogram_body
+    | subprogram_instantiation_declaration
+    | package_declaration
+    | package_body
+    | package_instantiation_declaration
+    | type_declaration
+    | subtype_declaration
+    | constant_declaration
+    | variable_declaration
+    | file_declaration
+    | alias_declaration
+    | attribute_declaration
+    | attribute_specification
+    | use_clause
+    | group_template_declaration
+    | group_declaration
+
+?package_body_declarative_item: declarative_item
+
+package_body_declarative_part: ( package_body_declarative_item )* -> as_list
+
+package_declaration: _PACKAGE identifier _IS package_header package_declarative_part _END [ PACKAGE ] [ package_simple_name ] _SEMICOLON
+
+package_declarative_item: subprogram_declaration
+    | subprogram_instantiation_declaration
+    | package_declaration
+    | package_instantiation_declaration
+    | type_declaration
+    | subtype_declaration
+    | constant_declaration
+    | signal_declaration
+    | variable_declaration
+    | file_declaration
+    | alias_declaration
+    | component_declaration
+    | attribute_declaration
+    | attribute_specification
+    | disconnection_specification
+    | use_clause
+    | group_template_declaration
+    | group_declaration
+//    | PSL_Property_Declaration
+//    | PSL_Sequence_Declaration
+
+package_declarative_part: ( package_declarative_item )* -> as_list
+
+package_header: [ generic_clause [ generic_map_aspect _SEMICOLON ] ]
+
+package_instantiation_declaration: _PACKAGE identifier _IS _NEW uninstantiated_package_name [ generic_map_aspect ] _SEMICOLON
+
+package_pathname: _AT library_logical_name _DOT ( package_simple_name _DOT )* object_simple_name
+
+parameter_specification: identifier _IN discrete_range
+
+partial_pathname: ( pathname_element _DOT )* object_simple_name
+
+pathname_element: entity_simple_name
+    | component_instantiation_label
+    | block_label
+    | generate_statement_label [ _LPAREN static_expression _RPAREN ]
+    | package_simple_name
+
+// was [ abstract_literal ] unit_name
+// doesn't really make sense not to be identifier (LRM 5.2.4.1)
+physical_literal: [ abstract_literal ] identifier
+
+physical_type_definition: range_constraint _UNITS primary_unit_declaration ( secondary_unit_declaration )* _END _UNITS [ physical_type_simple_name ]
+
+port_clause: _PORT _LPAREN _port_list _RPAREN _SEMICOLON
+
+_port_list: _port_interface_list
+
+port_map_aspect: _PORT _MAP _LPAREN port_association_list _RPAREN
+
+prefix: name
+    | function_call
+
+primary: name
+    | literal
+    | aggregate
+    | function_call
+    | qualified_expression
+    | type_conversion
+    | allocator
+    | _LPAREN expression _RPAREN
+
+primary_unit: entity_declaration
+    | configuration_declaration
+    | package_declaration
+    | package_instantiation_declaration
+    | context_declaration
+//    | PSL_Verification_Unit
+
+primary_unit_declaration: identifier _SEMICOLON
+
+procedure_call: procedure_name [ _LPAREN actual_parameter_part _RPAREN ]
+
+procedure_call_statement: [ label _COLON ] procedure_call _SEMICOLON
+
+procedure_specification: _PROCEDURE designator [ subprogram_header ] [ [ PARAMETER ] _LPAREN formal_parameter_list _RPAREN ]
+
+// replaced by generic declarative_item
+?process_declarative_item: declarative_item
+//process_declarative_item: subprogram_declaration
+//    | subprogram_body
+//    | subprogram_instantiation_declaration
+//    | package_declaration
+//    | package_body
+//    | package_instantiation_declaration
+//    | type_declaration
+//    | subtype_declaration
+//    | constant_declaration
+//    | variable_declaration
+//    | file_declaration
+//    | alias_declaration
+//    | attribute_declaration
+//    | attribute_specification
+//    | use_clause
+//    | group_template_declaration
+//    | group_declaration
+
+process_declarative_part: ( process_declarative_item )* -> as_list
+
+process_sensitivity_list: ALL | sensitivity_list
+
+process_statement: [ process_label _COLON ] [ POSTPONED ] _PROCESS [ _LPAREN process_sensitivity_list _RPAREN ] [ IS ] process_declarative_part _BEGIN process_statement_part _END [ POSTPONED ] _PROCESS [ process_label ] _SEMICOLON
+
+process_statement_part: ( sequential_statement )* -> as_list
+
+protected_type_body: _PROTECTED _BODY protected_type_body_declarative_part _END _PROTECTED _BODY [ protected_type_simple_name ]
+
+// replaced by generic declarative_item
+?protected_type_body_declarative_item: declarative_item
+//protected_type_body_declarative_item: subprogram_declaration
+//    | subprogram_body
+//    | subprogram_instantiation_declaration
+//    | package_declaration
+//    | package_body
+//    | package_instantiation_declaration
+//    | type_declaration
+//    | subtype_declaration
+//    | constant_declaration
+//    | variable_declaration
+//    | file_declaration
+//    | alias_declaration
+//    | attribute_declaration
+//    | attribute_specification
+//    | use_clause
+//    | group_template_declaration
+//    | group_declaration
+
+protected_type_body_declarative_part: ( protected_type_body_declarative_item )* -> as_list
+
+protected_type_declaration: _PROTECTED protected_type_declarative_part _END _PROTECTED [ protected_type_simple_name ]
+
+protected_type_declarative_item: subprogram_declaration
+    | subprogram_instantiation_declaration
+    | attribute_specification
+    | use_clause
+
+protected_type_declarative_part: ( protected_type_declarative_item )* -> as_list
+
+protected_type_definition: protected_type_declaration
+    | protected_type_body
+
+qualified_expression: type_mark _SQUOTE _LPAREN expression _RPAREN
+    | type_mark _SQUOTE aggregate
+
+range: range_attribute_name
+    | simple_expression DIRECTION simple_expression
+
+range_constraint: _RANGE range
+
+record_constraint: _LPAREN record_element_constraint ( _COMMA record_element_constraint )* _RPAREN
+
+record_element_constraint: record_element_simple_name _element_constraint
+
+record_element_resolution: record_element_simple_name resolution_indication
+
+record_resolution: record_element_resolution ( _COMMA record_element_resolution )* -> as_list
+
+// pull out list
+element_declaration_list: element_declaration+ -> as_list
+record_type_definition: _RECORD element_declaration_list _END _RECORD [ record_type_simple_name ]
+
+relation: shift_expression [ RELATIONAL_OPERATOR shift_expression ]
+
+RELATIONAL_OPERATOR: EQ
+    |  NE
+    |  LT
+    |  LTE
+    |  GT
+    |  GTE
+    |  EQ_M
+    |  NE_M
+    |  LT_M
+    |  LTE_M
+    |  GT_M
+    |  GTE_M
+
+relative_pathname: ( CARET _DOT )* partial_pathname
+
+// use SEVERITY_LEVEL from "assertion" rule
+report_statement: [ label _COLON ] _REPORT expression [ _SEVERITY SEVERITY_LEVEL ] _SEMICOLON
+
+resolution_indication: resolution_function_name
+    | _LPAREN element_resolution _RPAREN
+
+return_statement: [ label _COLON ] _RETURN [ expression ] _SEMICOLON
+
+scalar_type_definition: enumeration_type_definition
+    | integer_type_definition
+    | floating_type_definition
+    | physical_type_definition
+
+secondary_unit: architecture_body
+    | package_body
+
+secondary_unit_declaration: identifier EQ physical_literal _SEMICOLON
+
+selected_expressions: ( expression _WHEN choices _COMMA )* expression _WHEN choices
+
+selected_force_assignment: _WITH expression _SELECT [ QMARK ] target _LARROW _FORCE [ force_mode ] selected_expressions _SEMICOLON
+
+selected_name: prefix _DOT suffix
+
+selected_signal_assignment: selected_waveform_assignment
+    | selected_force_assignment
+
+selected_variable_assignment: _WITH expression _SELECT [ QMARK ] target _WALRUS selected_expressions _SEMICOLON
+
+selected_waveform_assignment: _WITH expression _SELECT [ QMARK ] target _LARROW [ delay_mechanism ] selected_waveforms _SEMICOLON
+
+selected_waveforms: ( waveform _WHEN choices _COMMA )* waveform _WHEN choices
+
+?sensitivity_clause: _ON sensitivity_list
+
+sensitivity_list: signal_name ( _COMMA signal_name )* -> as_list
+
+sequence_of_statements: ( sequential_statement )* -> as_list
+
+sequential_statement: wait_statement
+    | assertion_statement
+    | report_statement
+    | signal_assignment_statement
+    | variable_assignment_statement
+    | procedure_call_statement
+    | if_statement
+    | case_statement
+    | loop_statement
+    | next_statement
+    | exit_statement
+    | return_statement
+    | null_statement
+
+shift_expression: simple_expression [ SHIFT_OPERATOR simple_expression ]
+
+SHIFT_OPERATOR: SLL
+    | SRL
+    | SLA
+    | SRA
+    | ROL
+    | ROR
+
+SIGN.-99: PLUS
+    | MINUS
+
+signal_assignment_statement: [ label _COLON ] simple_signal_assignment
+    | [ label _COLON ] conditional_signal_assignment
+    | [ label _COLON ] selected_signal_assignment
+
+signal_declaration: _SIGNAL identifier_list _COLON subtype_indication [ signal_kind ] [ _WALRUS expression ] _SEMICOLON
+
+?signal_kind: REGISTER
+    | BUS
+
+signal_list: signal_name ( _COMMA signal_name )*
+    | OTHERS
+    | ALL
+
+// pull out list
+type_mark_list: type_mark ( _COMMA type_mark )* -> as_list
+signature: _LSQUARE [ type_mark_list ] [ _RETURN type_mark ] _RSQUARE
+
+simple_configuration_specification: _FOR component_specification binding_indication _SEMICOLON [ _END _FOR _SEMICOLON ]
+
+// pull out list
+simple_expression_op: ADDING_OPERATOR term
+simple_expression_op_list: ( simple_expression_op )* -> as_list
+simple_expression: [ SIGN ] term simple_expression_op_list
+
+simple_force_assignment: target _LARROW _FORCE [ force_mode ] expression _SEMICOLON
+
+_simple_name: identifier
+
+simple_release_assignment: target _LARROW _RELEASE [ force_mode ] _SEMICOLON
+
+simple_signal_assignment: simple_waveform_assignment
+    | simple_force_assignment
+    | simple_release_assignment
+
+simple_waveform_assignment: target _LARROW [ delay_mechanism ] waveform _SEMICOLON
+
+simple_variable_assignment: target _WALRUS expression _SEMICOLON
+
+slice_name: prefix _LPAREN discrete_range _RPAREN
+
+string_literal: _DQUOTE [ ESCAPED_GRAPHIC_STRING ] _DQUOTE
+
+subprogram_body: subprogram_specification _IS subprogram_declarative_part _BEGIN subprogram_statement_part _END [ SUBPROGRAM_KIND ] [ designator ] _SEMICOLON
+
+subprogram_declaration: subprogram_specification _SEMICOLON
+
+// replaced by generic declarative_item
+?subprogram_declarative_item: declarative_item
+//subprogram_declarative_item: subprogram_declaration
+//    | subprogram_body
+//    | subprogram_instantiation_declaration
+//    | package_declaration
+//    | package_body
+//    | package_instantiation_declaration
+//    | type_declaration
+//    | subtype_declaration
+//    | constant_declaration
+//    | variable_declaration
+//    | file_declaration
+//    | alias_declaration
+//    | attribute_declaration
+//    | attribute_specification
+//    | use_clause
+//    | group_template_declaration
+//    | group_declaration
+
+subprogram_declarative_part: ( subprogram_declarative_item )* -> as_list
+
+// move the optional [] up to containing rules
+subprogram_header: _GENERIC _LPAREN _generic_list _RPAREN [ generic_map_aspect ]
+
+subprogram_instantiation_declaration: SUBPROGRAM_KIND identifier _IS _NEW uninstantiated_subprogram_name [ signature ] [ generic_map_aspect ] _SEMICOLON
+
+SUBPROGRAM_KIND: _PROCEDURE
+    | _FUNCTION
+
+subprogram_specification: procedure_specification
+    | function_specification
+
+subprogram_statement_part: ( sequential_statement )* -> as_list
+
+subtype_declaration: _SUBTYPE identifier _IS subtype_indication _SEMICOLON
+
+subtype_indication: [ resolution_indication ] type_mark [ constraint ]
+
+suffix: _simple_name
+    | character_literal
+    | OPERATOR_SYMBOL
+    | ALL
+
+target: name
+    | aggregate
+
+term_op: MULTIPLYING_OPERATOR factor
+term_op_list: ( term_op )* -> as_list
+term: factor term_op_list
+
+?timeout_clause: _FOR time_expression
+
+tool_directive: _BACKTICK identifier [ GRAPHIC_STRING ]
+
+type_conversion: type_mark _LPAREN expression _RPAREN
+
+type_declaration: full_type_declaration
+    | incomplete_type_declaration
+
+type_definition: scalar_type_definition
+    | composite_type_definition
+    | access_type_definition
+    | file_type_definition
+    | protected_type_definition
+
+type_mark: type_name
+    | subtype_name
+
+// pull out list
+index_subtype_definition_list: index_subtype_definition ( _COMMA index_subtype_definition )* -> as_list
+unbounded_array_definition: _ARRAY _LPAREN index_subtype_definition_list _RPAREN _OF element_subtype_indication
+
+use_clause: _USE selected_name ( _COMMA selected_name )* _SEMICOLON
+
+variable_assignment_statement: [ label _COLON ] simple_variable_assignment
+    | [ label _COLON ] conditional_variable_assignment
+    | [ label _COLON ] selected_variable_assignment
+
+variable_declaration: [ SHARED ] _VARIABLE identifier_list _COLON subtype_indication [ _WALRUS expression ] _SEMICOLON
+
+verification_unit_binding_indication: _USE VUNIT verification_unit_list
+
+verification_unit_list: verification_unit_name ( _COMMA verification_unit_name )*
+
+wait_statement: [ label _COLON ] _WAIT [ sensitivity_clause ] [ condition_clause ] [ timeout_clause ] _SEMICOLON
+
+waveform: waveform_element ( _COMMA waveform_element )*
+    | UNAFFECTED
+
+waveform_element: value_expression [ _AFTER time_expression ]
+    | NULL [ _AFTER time_expression ]
+
+FORMAT_EFFECTOR: /[\t\v\r\n\f]/
+
+UPPER_CASE_LETTER: /[A-Z������������������������������]/
+
+DIGIT: "0".."9"
+
+// Split out ESCAPED_* to handle string literals, which may only contains double quotes if they are doubled up (LRM 15.7)
+SPECIAL_CHARACTER: /["#&'()*+,\-.\/:;<=>?@[\]_`|]/
+ESCAPED_SPECIAL_CHARACTER: /""|[#&'()*+,\-.\/:;<=>?@[\]_`|]/
+
+SPACE_CHARACTER: /[ \t\u00A0]/
+
+LOWER_CASE_LETTER: /[a-z��������������������������������]/
+
+OTHER_SPECIAL_CHARACTER: /[!$%\\^{}~�������������������?������������-]/
+
+// ignore PSL (further defined in IEEE-1850-2005)
+//PSL_Property_Declaration: PROPERTY PSL_Identifier [ _LPAREN Formal_Parameter_List _RPAREN ] DEF_SYM Property ;
+//
+//Formal_Parameter_List: Formal_Parameter { ; Formal_Parameter }
+//
+//Formal_Parameter: Param_Spec PSL_Identifier { , PSL_Identifier }
+//
+//Param_Spec: CONST
+//    | [CONST | MUTABLE] Value_Parameter
+//    | SEQUENCE
+//    | PROPERTY
+//
+//Value_Parameter: HDL_Type
+//    | PSL_Type_Class
+//
+//HDL_Type: "hdltype" HDL_VARIABLE_TYPE
+//
+//PSL_Type_Class: "boolean" | "bit" | "bitvector" | "numeric" | "string"
+//
+//PSL_Sequence_Declaration: SEQUENCE PSL_Identifier [ _LPAREN Formal_Parameter_List _RPAREN ] DEF_SYM Sequence ;
+//
+//PSL_Clock_Declaration: DEFAULT "clock" DEF_SYM Clock_Expression ;
+//
+//Clock_Expression: boolean_Name
+//    | boolean_Built_In_Function_Call
+//    | ( Boolean )
+//    | ( HDL_CLOCK_EXPR )
+//
+//Actual_Parameter_List: Actual_Parameter { , Actual_Parameter }
+//
+//Actual_Parameter: AnyType | Number | Boolean | Property | Sequence
+//
+//PSL_Directive: [ Label : ] Verification_Directive
+//
+//PSL_Verification_Unit: external
