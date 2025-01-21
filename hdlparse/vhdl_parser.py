@@ -857,7 +857,7 @@ class VhdlExtractor:
                 self._register_array_types(self.extract_objects(fname))
 
 
-if __name__ == '__main__':
+def main():
     ve = VhdlExtractor()
     code = '''
 package foo is
@@ -892,3 +892,7 @@ end package;
                 print(p)
         except AttributeError:
             pass
+
+
+if __name__ == '__main__':
+    main()
