@@ -337,9 +337,12 @@ class HdlSymbol(object):
 
     def draw(self, x, y, c):
         style = c.surf.def_styles
-        sym_width = max(
-            s.min_width(c, style.font) for sym in self.symbols for s in sym.sections
-        )
+        try:
+            sym_width = max(
+                s.min_width(c, style.font) for sym in self.symbols for s in sym.sections
+            )
+        except ValueError:
+            return False
 
         sym_width = (sym_width // self.width_steps + 1) * self.width_steps
 
@@ -375,6 +378,7 @@ class HdlSymbol(object):
                 font=("Helvetica", 12, "bold"),
             )
 
+        return True
 
 def make_section(sname, sect_pins, fill, extractor, no_type=False):
     """Create a section from a pin list"""
@@ -392,11 +396,10 @@ def make_section(sname, sect_pins, fill, extractor, no_type=False):
             pdir = "out"
 
         # Determine which side the pin is on
-        if pdir in ("out", "inout"):
-            side = "r"
-        else:
+        if pdir in ("in"):
             side = "l"
-            assert pdir in ("in")
+        else:
+            side = "r"
 
         data_type = None
         if not no_type:
@@ -690,7 +693,7 @@ def main():
         all_components = dict()
         for f in flist:
             if vhdl.is_vhdl(f):
-                all_components[f] = (vhdl_ex, vhdl_filter(vhdl_ex.extract_objects(f)))
+                all_components[f] = (vhdl_ex, vhdl_ex.extract_objects(f, vhdl_types))
             else:
                 all_components[f] = (vlog_ex, vlog_ex.extract_objects(f))
 
@@ -767,11 +770,11 @@ def main():
             nc.clear_shapes()
 
             sym = make_symbol(comp, extractor, args.title, args.libname, args.no_type)
-            sym.draw(0, 0, nc)
+            if sym.draw(0, 0, nc):
 
-            nc.render(args.transparent)
+                nc.render(args.transparent)
 
-            print('Created {} from {} ({})'.format(fname, comp.name, source), file=sys.stderr)
+                print('Created {} from {} ({})'.format(fname, comp.name, source), file=sys.stderr)
     if args.component != "" and found_filter_component == 0:
         log.error(f"No diagrams were generated, because component {args.component} was not found")
         sys.exit(2)
