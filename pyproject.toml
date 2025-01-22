@@ -1,6 +1,6 @@
 [project]
 name = "hdltree"
-version = "0.0.1"
+version = "0.1.0"
 authors = [{ name = "Rajan Patel", email = "rpatel3001@gmail.com" }]
 readme = "README.md"
 classifiers = [
@@ -17,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License"
 ]
-keywords = ["RTL", "HDL", "VHDL", "Verilog", "symbol", "symbolator", "sphinx"]
+keywords = ["RTL", "HDL", "VHDL", "System", "Verilog", "SystemVerilog", "symbol", "symbolator", "sphinx", "hdlparse", "parse", "format", "validate"]
 license = { file = "LICENSE" }
 description = "Pure Python HDL parser, plus symbol generator and sphinx domain"
 requires-python = ">=3.10"
@@ -29,6 +29,7 @@ dependencies =[
 ]
 
 [project.optional-dependencies]
+regex = ["regex"]
 symbolator = ["pygobject", "pycairo"]
 
 [project.urls]
