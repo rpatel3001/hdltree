@@ -2,162 +2,18 @@
 # Copyright © 2017 Kevin Thibedeau
 # Distributed under the terms of the MIT license
 """VHDL documentation parser"""
+
 import ast
 import io
 import os
 import re
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Set
-from .minilexer import MiniLexer
 
+from hdltree.hdltree import VhdlParser
+from hdltree.VhdlCstTransformer import *
 
-vhdl_tokens = {
-    'root': [
-        (r'package\s+(\w+)\s+is', 'package', 'package'),
-        (r'package\s+body\s+(\w+)\s+is', 'package_body', 'package_body'),
-        (r'function\s+(\w+|"[^"]+")\s*\(', 'function', 'param_list'),
-        (r'procedure\s+(\w+)\s*\(', 'procedure', 'param_list'),
-        (r'function\s+(\w+)', 'function', 'simple_func'),
-        (r'component\s+(\w+)\s*is', 'component', 'component'),
-        (r'entity\s+(\w+)\s*is', 'entity', 'entity'),
-        (r'architecture\s+(\w+)\s*of', 'architecture', 'architecture'),
-        (r'subtype\s+(\w+)\s+is\s+(\w+)', 'subtype'),
-        (r'type\s+(\w+)\s*is', 'type', 'type_decl'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'package': [
-        (r'function\s+(\w+|"[^"]+")\s*\(', 'function', 'param_list'),
-        (r'procedure\s+(\w+)\s*\(', 'procedure', 'param_list'),
-        (r'function\s+(\w+)', 'function', 'simple_func'),
-        (r'component\s+(\w+)\s*is', 'component', 'component'),
-        (r'subtype\s+(\w+)\s+is\s+(\w+)', 'subtype'),
-        (r'constant\s+(\w+)\s+:\s+(\w+)', 'constant'),
-        (r'type\s+(\w+)\s*is', 'type', 'type_decl'),
-        (r'end\s+\w+\s*;', None, '#pop'),
-        (r'--#(.*)\n', 'metacomment'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'package_body': [
-        (r'end\s+\w+\s*;', None, '#pop'),
-        (r'--#(.*)\n', 'metacomment'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'type_decl': [
-        (r'array', 'array_type', '#pop'),
-        (r'file', 'file_type', '#pop'),
-        (r'access', 'access_type', '#pop'),
-        (r'record', 'record_type', '#pop'),
-        (r'range', 'range_type', '#pop'),
-        (r'\(', 'enum_type', '#pop'),
-        (r';', 'incomplete_type', '#pop'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'param_list': [
-        (r'\s*((?:variable|signal|constant|file)\s+)?(\w+)\s*', 'param'),
-        (r'\s*,\s*', None),
-        (r'\s*:\s*', None, 'param_type'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'param_type': [
-        (r'\s*((?:in|out|inout|buffer)\s+)?(\w+)\s*', 'param_type'),
-        (r'\s*;\s*', None, '#pop'),
-        (r"\s*:=\s*('.'|[^\s;)]+)", 'param_default'),
-        (r'\)\s*(?:return\s+(\w+)\s*)?;', 'end_subprogram', '#pop:2'),
-        (r'\)\s*(?:return\s+(\w+)\s*)?is', None, '#pop:2'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'simple_func': [
-        (r'\s+return\s+(\w+)\s*;', 'end_subprogram', '#pop'),
-        (r'\s+return\s+(\w+)\s+is', None, '#pop'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'component': [
-        (r'generic\s*\(', None, 'generic_list'),
-        (r'port\s*\(', None, 'port_list'),
-        (r'end\s+component\s*\w*;', 'end_component', '#pop'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'entity': [
-        (r'generic\s*\(', None, 'generic_list'),
-        (r'port\s*\(', None, 'port_list'),
-        (r'end\s+\w+\s*;', 'end_entity', '#pop'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'architecture': [
-        (r'end\s+\w+\s*;', 'end_arch', '#pop'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'type\s+(\w+)\s*is', 'type', 'type_decl'),
-        (r'--.*\n', None),
-    ],
-    'generic_list': [
-        (r'\s*(\w+)\s*', 'generic_param'),
-        (r'\s*,\s*', None),
-        (r'\s*:\s*', None, 'generic_param_type'),
-        (r'--#(.*)\n', 'metacomment'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'generic_param_type': [
-        (r'\s*(\w+)[ \t\r\f\v]*', 'generic_param_type'),
-        (r'\s*;\s*', None, '#pop'),
-        (r"\s*:=\s*([\w']+)", 'generic_param_default'),
-        (r'\)\s*;\s*--(.*)\n', 'line_comment', '#pop:2'),
-        (r'\n\s*\)\s*;\s*--(.*)\n', 'generic_list_comment', '#pop:2'),
-        (r'\n\s*', None),
-        (r'\)\s*;', 'end_generic', '#pop:2'),
-        (r'--#(.*)\n', 'metacomment'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--.*\n', None),
-    ],
-    'port_list': [
-        (r'\s*(\w+)\s*', 'port_param'),
-        (r'\s*,\s*', None),
-        (r'\s*:\s*', None, 'port_param_type'),
-        (r'--#\s*{{(.*)}}\n', 'section_meta'),
-        (r'--#(.*)\n', 'metacomment'),
-        (r'/\*', 'block_comment', 'block_comment'),
-        (r'--(.*)\n', 'line_comment'),
-    ],
-    'port_param_type': [
-        (r'\s*(in|out|inout|buffer)\s+(\w+)\s*\(', 'port_array_param_type', 'array_range'),
-        (r'\s*(in|out|inout|buffer)\s+(\w+)[ \t\r\f\v]*', 'port_param_type'),
-        (r'\s*;\s*', None, '#pop'),
-        (r"\s*:=\s*([\w']+)", 'port_param_default'),
-        (r'--(.*)\n', 'line_comment'),
-        (r'\)\s*;\s*--(.*)\n', 'line_comment', '#pop:2'),
-        (r'\n\s*\)\s*;\s*--(.*)\n', 'port_list_comment', '#pop:2'),
-        (r'\n\s*', None),
-        (r'\)\s*;', 'end_port', '#pop:2'),
-
-        (r'--#(.*)\n', 'metacomment'),
-        (r'/\*', 'block_comment', 'block_comment'),
-    ],
-    'array_range': [
-        (r'\(', 'open_paren', 'nested_parens'),
-        (r'\s*([\w\+\-\*/\s]+)(\s+(?:down)?to)\s+([\w\+\-\*/\s]+)', 'array_range_val'),
-        (r'\)', 'array_range_end', '#pop'),
-    ],
-    'nested_parens': [
-        (r'\(', 'open_paren', 'nested_parens'),
-        (r'\s*([\w\+\-\*/\s]+)(\s+(?:down)?to)\s+([\w\+\-\*/\s]+)', 'array_range_val'),
-        (r'\)', 'close_paren', '#pop'),
-    ],
-    'block_comment': [
-        (r'\*/', 'end_comment', '#pop'),
-    ],
-}
-
-VhdlLexer = MiniLexer(vhdl_tokens, flags=re.MULTILINE | re.IGNORECASE)
-
+VhdlParser = VhdlParser()
 
 class VhdlObject:
     """Base class for parsed VHDL objects
@@ -420,7 +276,7 @@ def parse_vhdl_file(fname):
     Returns:
       Parsed objects.
     """
-    with open(fname, 'rt', encoding='UTF-8') as fh:
+    with open(fname, 'rt', encoding='latin-1') as fh:
         text = fh.read()
     return parse_vhdl(text)
 
@@ -433,232 +289,110 @@ def parse_vhdl(text):
     Returns:
       Parsed objects.
     """
-    lex = VhdlLexer
-
-    name = None
-    kind = None
-    saved_type = None
-    end_param_group = False
-    cur_package = None
-
-    metacomments = []
-    parameters = []
-    param_items = []
-
-    generics = []
-    ports = []
-    sections = []
-    port_param_index = 0
-    last_items = []
-    array_range_start_pos = 0
+    cst = VhdlParser.parse(text)
 
     objects = []
 
-    for pos, action, groups in lex.run(text):
-        if action == 'metacomment':
-            realigned = re.sub(r'^#+', lambda m: ' ' * len(m.group(0)), groups[0])
-            if not last_items:
-                metacomments.append(realigned)
+    for node in cst.iter_subtrees_topdown():
+        if isinstance(node, SubprogramDeclaration):
+            spec = node.specification.specification
+            if isinstance(spec, ProcedureSpecification):
+                kind = 'procedure'
             else:
-                for i in last_items:
-                    i.desc = realigned
-        if action == 'section_meta':
-            sections.append((port_param_index, groups[0]))
-
-        elif action == 'function':
-            kind = 'function'
-            name = groups[0]
-            param_items = []
+                kind = 'function'
+            name = str(spec.designator)
             parameters = []
-        elif action == 'procedure':
-            kind = 'procedure'
-            name = groups[0]
-            param_items = []
-            parameters = []
-        elif action == 'param':
-            if end_param_group:
-                # Complete previous parameters
-                for i in param_items:
-                    parameters.append(i)
-                param_items = []
-                end_param_group = False
-
-            param_items.append(VhdlParameter(groups[1]))
-        elif action == 'param_type':
-            mode, ptype = groups
-
-            if mode is not None:
-                mode = mode.strip()
-
-            for i in param_items:  # Set mode and type for all pending parameters
-                i.mode = mode
-                i.data_type = ptype
-
-            end_param_group = True
-
-        elif action == 'param_default':
-            for i in param_items:
-                i.default_value = groups[0]
-
-        elif action == 'end_subprogram':
-            # Complete last parameters
-            for i in param_items:
-                parameters.append(i)
+            for param in spec.formal_parameter_list:
+              decl = param.parameter_declaration
+              for id in decl.identifier_list:
+                default = None
+                if decl.default:
+                    default = str(decl.default)
+                if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                    ptype = VhdlParameterType(
+                        str(decl.subtype_indication.type_mark),
+                        decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                        str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                        str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                        str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                    )
+                else:
+                    ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                parameters += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
 
             if kind == 'function':
-                vobj = VhdlFunction(name, cur_package, parameters, groups[0], metacomments)
+                vobj = VhdlFunction(name, cur_package, parameters, str(spec.type_mark))
             else:
-                vobj = VhdlProcedure(name, cur_package, parameters, metacomments)
-
+                vobj = VhdlProcedure(name, cur_package, parameters)
             objects.append(vobj)
 
-            metacomments = []
-            parameters = []
-            param_items = []
-            kind = None
-            name = None
-
-        elif action == 'entity':
-            kind = 'entity'
-            name = groups[0]
-            generics = []
-            ports = []
-            param_items = []
-            sections = []
-            port_param_index = 0
-
-        elif action == 'component':
-            kind = 'component'
-            name = groups[0]
-            generics = []
-            ports = []
-            param_items = []
-            sections = []
-            port_param_index = 0
-
-        elif action == 'generic_param':
-            param_items.append(groups[0])
-
-        elif action == 'generic_param_type':
-            ptype = groups[0]
-            last_items = []
-            for i in param_items:
-                param = VhdlParameter(i, 'in', VhdlParameterType(ptype))
-                generics.append(param)
-                last_items.append(param)
-
-            param_items = []
-
-        elif action == 'generic_param_default':
-            for i in last_items:
-                i.default_value = groups[0]
-
-        elif action == 'port_param':
-            param_items.append(groups[0])
-            port_param_index += 1
-
-        elif action == 'port_param_type':
-            mode, ptype = groups
-
-            last_items = []
-            for i in param_items:
-                param = VhdlParameter(i, mode, VhdlParameterType(ptype))
-                ports.append(param)
-                last_items.append(param)
-
-            param_items = []
-
-        elif action == 'port_param_default':
-            for i in last_items:
-                i.default_value = groups[0]
-
-        elif action == 'port_array_param_type':
-            mode, ptype = groups
-            array_range_start_pos = pos[1]
-
-        elif action == 'array_range_val':
-            l_bound, direction, r_bound = groups
-            if direction:
-                direction = direction.strip()
-            if l_bound:
-                try:
-                    l_bound = l_bound.replace("/", "//")
-                    l_bound = eval(l_bound)
-                except Exception:
-                    pass
-            if r_bound:
-                try:
-                    r_bound = r_bound.replace("/", "//")
-                    r_bound = eval(r_bound)
-                except Exception:
-                    pass
-
-        elif action == 'array_range_end':
-            if l_bound and r_bound and direction:
-                arange = " ".join([l_bound, direction, r_bound])
+        elif isinstance(node, EntityDeclaration):
+            if genclause := node.entity_header.generic_clause:
+                generics = []
+                for elem in genclause.interface_elements:
+                    decl = elem.generic_declaration
+                    for id in decl.identifier_list:
+                        default = None
+                        if decl.default:
+                            default = str(decl.default)
+                        if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                            ptype = VhdlParameterType(
+                                str(decl.subtype_indication.type_mark),
+                                decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                            )
+                        else:
+                            ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                        generics += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
             else:
-                arange = text[array_range_start_pos:pos[0] + 1]
-            # arange = arange.strip().lstrip("(")
-            # match = re.match("\s*\(?\s*(.*)\s+(downto|to)\s+(.*)\s*\)\s*", arange, re.IGNORECASE)
-            # if match:
-            #     print("------", match.groups())
-            #     arange = " ".join(match.groups())
+                generics = None
 
-            last_items = []
-            for i in param_items:
-                param = VhdlParameter(i, mode, VhdlParameterType(ptype, direction, r_bound, l_bound, arange))
-                ports.append(param)
-                last_items.append(param)
+            ports = []
+            if portclause := node.entity_header.port_clause:
+                for elem in portclause.interface_elements:
+                    decl = elem.port_declaration
+                    for id in decl.identifier_list:
+                        default = None
+                        if decl.default:
+                            default = str(decl.default)
+                        if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                            ptype = VhdlParameterType(
+                                str(decl.subtype_indication.type_mark),
+                                decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                            )
+                        else:
+                            ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                        ports += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
 
-            param_items = []
-
-        elif action == 'end_entity':
-            vobj = VhdlEntity(name, ports, generics, dict(sections), metacomments)
+            vobj = VhdlEntity(str(node.identifier), ports, generics)
             objects.append(vobj)
-            last_items = []
-            metacomments = []
 
-        elif action == 'end_component':
-            vobj = VhdlComponent(name, cur_package, ports, generics, dict(sections), metacomments)
+#        elif isinstance(node, ComponentDeclaration):
+#            vobj = VhdlComponent(name, cur_package, ports, generics)
+#            objects.append(vobj)
+#
+        elif isinstance(node, PackageDeclaration):
+            cur_package = str(node.identifier)
+            objects.append(VhdlPackage(str(node.identifier)))
+
+#        elif isinstance(node, TypeDeclaration):
+#            vobj = VhdlType(node.declaration.identifier, cur_package, action)
+#            objects.append(vobj)
+#
+        elif isinstance(node, SubtypeDeclaration):
+            vobj = VhdlSubtype(str(node.identifier), cur_package, str(node.subtype_indication))
             objects.append(vobj)
-            last_items = []
-            metacomments = []
 
-        elif action == 'package':
-            objects.append(VhdlPackage(groups[0]))
-            cur_package = groups[0]
-            kind = None
-            name = None
-
-        elif action == 'type':
-            saved_type = groups[0]
-
-        elif action in (
-                'array_type', 'file_type', 'access_type', 'record_type', 'range_type', 'enum_type', 'incomplete_type'):
-            vobj = VhdlType(saved_type, cur_package, action, metacomments)
-            objects.append(vobj)
-            kind = None
-            name = None
-            metacomments = []
-
-        elif action == 'subtype':
-            vobj = VhdlSubtype(groups[0], cur_package, groups[1], metacomments)
-            objects.append(vobj)
-            kind = None
-            name = None
-            metacomments = []
-
-        elif action == 'constant':
-            vobj = VhdlConstant(groups[0], cur_package, groups[1], metacomments)
-            objects.append(vobj)
-            kind = None
-            name = None
-            metacomments = []
-
-        elif action == 'line_comment':
-            for i in last_items:
-                if not i.param_desc:
-                    i.param_desc = groups[0]
+        elif isinstance(node, ConstantDeclaration):
+            if isinstance(node.parent, PackageDeclarativeItem):
+              for id in node.identifiers:
+                vobj = VhdlConstant(str(id.id), cur_package, str(node.subtype_indication))
+                objects.append(vobj)
 
     return objects
 
@@ -806,7 +540,7 @@ class VhdlExtractor:
           fname (str): Name of file to load array database from
         """
         type_defs = ''
-        with open(fname, 'rt', encoding='UTF-8') as fh:
+        with open(fname, 'rt', encoding='latin-1') as fh:
             type_defs = fh.read()
 
         try:
@@ -823,7 +557,7 @@ class VhdlExtractor:
           fname (str): Name of file to save array database to
         """
         type_defs = {'arrays': sorted(list(self.array_types))}
-        with open(fname, 'wt', encoding='UTF-8') as fh:
+        with open(fname, 'wt', encoding='latin-1') as fh:
             pprint(type_defs, stream=fh)
 
     def _register_array_types(self, objects):
