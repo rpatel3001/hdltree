@@ -507,7 +507,7 @@ def parse_args():
         "--library",
         dest="lib_dirs",
         action="append",
-        default=["."],
+        default=[],
         help="Library path",
     )
     parser.add_argument(
@@ -638,7 +638,7 @@ def main():
     vhdl_ex = vhdl.VhdlExtractor()
     vlog_ex = vlog.VerilogExtractor()
 
-    if os.path.isfile(args.lib_dirs[0]):
+    if args.lib_dirs and os.path.isfile(args.lib_dirs[0]):
         # This is a file containing previously parsed array type names
         vhdl_ex.load_array_types(args.lib_dirs[0])
 
