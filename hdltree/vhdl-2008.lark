@@ -369,37 +369,31 @@ binding_indication: [ _USE entity_aspect ] [ generic_map_aspect ] [ port_map_asp
 // was BASE: INTEGER, but it must be 2 to 16 (LRM 15.5.3)
 BASE: /([2-9]|1[0-6])/
 
-BASE_SPECIFIER_BIN: "B"i
+BASE_SPECIFIER: "B"i
+    | "O"i
+    | "X"i
     | "UB"i
-    | "SB"i
-BASE_SPECIFIER_OCT: "O"i
     | "UO"i
-    | "SO"i
-BASE_SPECIFIER_HEX: "X"i
     | "UX"i
+    | "SB"i
+    | "SO"i
     | "SX"i
-BASE_SPECIFIER_DEC: "D"i
+    | "D"i
 
 BASED_INTEGER: EXTENDED_DIGIT ( [ UNDERLINE ] EXTENDED_DIGIT )*
 
-// split bit value and bit string literal for specificity based on LRM (15.8)
 based_literal: BASE _HASH BASED_INTEGER [ _DOT BASED_INTEGER ] _HASH [ exponent ]
 
-//BIT_VALUE: GRAPHIC_CHARACTER ( [ UNDERLINE ] GRAPHIC_CHARACTER )*
-BIT_VALUE_BIN: /[01]/ ( [ UNDERLINE ] /[01]/ )*
-BIT_VALUE_OCT: /[0-7]/ ( [ UNDERLINE ] /[0-7]/ )*
-BIT_VALUE_HEX: EXTENDED_DIGIT ( [ UNDERLINE ] EXTENDED_DIGIT )*
-BIT_VALUE_DEC: DIGIT ( [ UNDERLINE ] DIGIT )*
+BIT_VALUE_CHAR: UPPER_CASE_LETTER
+    | DIGIT
+    | ESCAPED_SPECIAL_CHARACTER_NO_ULINE
+    | SPACE_CHARACTER
+    | LOWER_CASE_LETTER
+    | OTHER_SPECIAL_CHARACTER
 
-_bit_string_literal_bin: [ INTEGER ] BASE_SPECIFIER_BIN _DQUOTE [ BIT_VALUE_BIN ] _DQUOTE
-_bit_string_literal_oct: [ INTEGER ] BASE_SPECIFIER_OCT _DQUOTE [ BIT_VALUE_OCT ] _DQUOTE
-_bit_string_literal_hex: [ INTEGER ] BASE_SPECIFIER_HEX _DQUOTE [ BIT_VALUE_HEX ] _DQUOTE
-_bit_string_literal_dec: [ INTEGER ] BASE_SPECIFIER_DEC _DQUOTE [ BIT_VALUE_DEC ] _DQUOTE
+BIT_VALUE: BIT_VALUE_CHAR ( [ UNDERLINE ] BIT_VALUE_CHAR )*
 
-bit_string_literal: _bit_string_literal_bin
-    | _bit_string_literal_oct
-    | _bit_string_literal_hex
-    | _bit_string_literal_dec
+bit_string_literal: [ INTEGER ] BASE_SPECIFIER _DQUOTE [ BIT_VALUE ] _DQUOTE
 
 // pull out lists
 use_clause_list: ( use_clause )* -> as_list
@@ -1401,7 +1395,9 @@ UPPER_CASE_LETTER: /[A-Zюабцдефгхийклмнопярстужьызшэщч]/
 DIGIT: "0".."9"
 
 // Split out ESCAPED_* to handle string literals, which may only contains double quotes if they are doubled up (LRM 15.7)
+// SPECIAL_CHARACTER_NO_ULINE is for bit string literals (LRM 15.8)
 SPECIAL_CHARACTER: /["#&'()*+,\-.\/:;<=>?@[\]_`|]/
+ESCAPED_SPECIAL_CHARACTER_NO_ULINE: /""|[#&'()*+,\-.\/:;<=>?@[\]`|]/
 ESCAPED_SPECIAL_CHARACTER: /""|[#&'()*+,\-.\/:;<=>?@[\]_`|]/
 
 SPACE_CHARACTER: /[ \t\u00A0]/
