@@ -482,7 +482,7 @@ class Expression(_VhdlCstListNode):
         terms = len(_list)
         if 2 == terms:
             super().__setattr__("conditional", _list[0])
-            super().__setattr__("expression", _list[2])
+            super().__setattr__("expression", _list[1])
         elif 1 == terms:
             super().__setattr__("conditional", None)
             super().__setattr__("expression", _list[0])
