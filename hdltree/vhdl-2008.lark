@@ -1396,7 +1396,7 @@ waveform_element: value_expression [ _AFTER time_expression ]
 
 FORMAT_EFFECTOR: /[\t\v\r\n\f]/
 
-UPPER_CASE_LETTER: /[A-ZпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ]/
+UPPER_CASE_LETTER: /[A-ZАБВГДЕЖЗИЙКЛМНОПРСТУФХЦШЩЪЫЬЭЮ]/
 
 DIGIT: "0".."9"
 
@@ -1406,9 +1406,9 @@ ESCAPED_SPECIAL_CHARACTER: /""|[#&'()*+,\-.\/:;<=>?@[\]_`|]/
 
 SPACE_CHARACTER: /[ \t\u00A0]/
 
-LOWER_CASE_LETTER: /[a-zпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ]/
+LOWER_CASE_LETTER: /[a-zЯабвгдежзийклмнопрстуфхцшщъыьэюя]/
 
-OTHER_SPECIAL_CHARACTER: /[!$%\\^{}~пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ?пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ-]/
+OTHER_SPECIAL_CHARACTER: /[!$%\^{}~ЎўЈ¤Ґ¦§Ё©Є«¬®Ї°±Ііґ?¶·ё№є»јЅѕїЧч-]/
 
 // ignore PSL (further defined in IEEE-1850-2005)
 //PSL_Property_Declaration: PROPERTY PSL_Identifier [ _LPAREN Formal_Parameter_List _RPAREN ] DEF_SYM Property ;
