@@ -133,10 +133,10 @@ INERTIAL: /\binertial\b/i
 INOUT: /\binout\b/i
 IS: /\bis\b/i
 _IS: /\bis\b/i
-//LABEL: /\blabel\b/i
+LABEL: /\blabel\b/i
 _LIBRARY: /\blibrary\b/i
 LINKAGE: /\blinkage\b/i
-//LITERAL: /\bliteral\b/i
+LITERAL: /\bliteral\b/i
 _LOOP: /\bloop\b/i
 _MAP: /\bmap\b/i
 MOD: /\bmod\b/i
@@ -217,7 +217,7 @@ XOR: /\bxor\b/i
 ?passive_concurrent_procedure_call_statement: concurrent_procedure_call_statement
 ?guard_condition: condition
 ?static_discrete_range: discrete_range
-//?file_open_kind_expression: expression
+?file_open_kind_expression: expression
 ?static_expression: expression
 ?string_expression: expression
 ?time_expression: expression
@@ -336,16 +336,7 @@ _array_element_resolution: resolution_indication
 array_type_definition: unbounded_array_definition
     | constrained_array_definition
 
-// severity level is limited to a predefined enum (LRM 10.3, LRM 16.3)
-NOTE: "NOTE"i
-WARNING: "WARNING"i
-ERROR: "ERROR"i
-FAILURE: "FAILURE"i
-SEVERITY_LEVEL: NOTE
-    | WARNING
-    | ERROR
-    | FAILURE
-assertion: _ASSERT condition [ _REPORT expression ] [ _SEVERITY SEVERITY_LEVEL ]
+assertion: _ASSERT condition [ _REPORT expression ] [ _SEVERITY expression ]
 
 assertion_statement: [ label _COLON ] assertion _SEMICOLON
 
@@ -592,8 +583,8 @@ entity_aspect: _ENTITY entity_name [ _LPAREN architecture_identifier _RPAREN ]
     | SIGNAL
     | VARIABLE
     | _COMPONENT
-//    | LABEL
-//    | LITERAL
+    | LABEL
+    | LITERAL
     | _UNITS
     | _GROUP
     | _FILE
@@ -695,13 +686,7 @@ file_declaration: _FILE identifier_list _COLON subtype_indication [ file_open_in
 
 ?file_logical_name: string_expression
 
-// replace file_open_kind_expression with a limited list of options defined in STD.STANDARD (LRM 6.4.2.5, LRM 16.3)
-//file_open_information: [ _OPEN file_open_kind_expression ] _IS file_logical_name
-file_open_information: [ _OPEN FILE_OPEN_KIND_EXPRESSION ] _IS file_logical_name
-
-FILE_OPEN_KIND_EXPRESSION: "READ_MODE"i
-    | "WRITE_MODE"i
-    | "APPEND_MODE"i
+file_open_information: [ _OPEN file_open_kind_expression ] _IS file_logical_name
 
 file_type_definition: _FILE _OF type_mark
 
@@ -709,7 +694,7 @@ floating_type_definition: range_constraint
 
 for_generate_statement: generate_label _COLON _FOR generate_parameter_specification _GENERATE generate_statement_body _END _GENERATE [ generate_label ] _SEMICOLON
 
-!force_mode: IN
+force_mode: IN
     | OUT
 
 _formal_designator: generic_name
@@ -1184,8 +1169,7 @@ RELATIONAL_OPERATOR: EQ
 
 relative_pathname: ( CARET _DOT )* partial_pathname
 
-// use SEVERITY_LEVEL from "assertion" rule
-report_statement: [ label _COLON ] _REPORT expression [ _SEVERITY SEVERITY_LEVEL ] _SEMICOLON
+report_statement: [ label _COLON ] _REPORT expression [ _SEVERITY expression ] _SEMICOLON
 
 resolution_indication: resolution_function_name
     | _LPAREN element_resolution _RPAREN
