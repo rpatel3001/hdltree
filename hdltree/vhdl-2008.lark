@@ -1404,7 +1404,7 @@ SPACE_CHARACTER: /[ \t\u00A0]/
 
 LOWER_CASE_LETTER: /[a-zίΰαβγδεζηθικλμνξοπρςστυφψωϊϋόύώÿ]/
 
-OTHER_SPECIAL_CHARACTER: /[!$%\^{}~΅Ά£¤¥¦§¨©ª«¬®―°±²³΄?¶·ΈΉΊ»Ό½ΎΏΧχ-]/
+OTHER_SPECIAL_CHARACTER: /[!$%\\^{}~΅Ά£¤¥¦§¨©ª«¬®―°±²³΄?¶·ΈΉΊ»Ό½ΎΏΧχ-]/
 
 // ignore PSL (further defined in IEEE-1850-2005)
 //PSL_Property_Declaration: PROPERTY PSL_Identifier [ _LPAREN Formal_Parameter_List _RPAREN ] DEF_SYM Property ;
