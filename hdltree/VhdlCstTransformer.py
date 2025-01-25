@@ -490,16 +490,14 @@ class Expression(_VhdlCstListNode):
     def format(self):
         return nonestr(self.conditional, post=" ") + str(self.expression)
 
-
 @dataclass
-class Range(_VhdlCstNode):
+class RangeLiteral(_VhdlCstNode):
     left: SimpleExpression
     direction: Token
     right: SimpleExpression
 
     def format(self):
         return f"{self.left} {self.direction} {self.right}"
-
 
 @dataclass
 class DiscreteRange(_VhdlCstNode):
@@ -619,6 +617,7 @@ class AttributeName(_VhdlCstNode):
     def format(self):
         return f"{self.prefix}{nonestr(self.signature)}'{self.attribute_designator}{nonestr(self.expression, pre='(', post=')')}"
 
+Range = AttributeName | RangeLiteral
 
 @dataclass
 class SliceName(_VhdlCstNode):
@@ -1928,7 +1927,7 @@ class WaitStatement(_VhdlCstNode):
 class Assertion(_VhdlCstNode):
     condition: Expression
     report: Expression | None
-    severity: Token | None
+    severity: Expression | None
 
     def format(self):
         return (
@@ -2019,7 +2018,7 @@ class ExitStatement(_VhdlCstNode):
 class ReportStatement(_VhdlCstNode):
     label: Identifier | None
     expression: Expression
-    severity: Token | None
+    severity: Expression | None
 
     def format(self):
         return f"{nonestr(self.label, post=': ')}report {self.expression}{nonestr(self.severity, pre=' severity ')};"

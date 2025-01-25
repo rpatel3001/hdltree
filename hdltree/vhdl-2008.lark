@@ -1151,7 +1151,7 @@ qualified_expression: type_mark _SQUOTE _LPAREN expression _RPAREN
     | type_mark _SQUOTE aggregate
 
 range: range_attribute_name
-    | simple_expression DIRECTION simple_expression
+    | simple_expression DIRECTION simple_expression -> range_literal
 
 range_constraint: _RANGE range
 
