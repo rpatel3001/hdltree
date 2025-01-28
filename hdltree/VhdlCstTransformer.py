@@ -10,15 +10,13 @@ from dataclasses import InitVar, fields
 from re import sub
 
 if getenv("DEBUG"):
-    # check datatypes with pydantic, ~twice as slow
+    # check datatypes with pydantic, somewhat slower
     from pydantic import ConfigDict
     from pydantic.dataclasses import dataclass
 
-    dataclass = dataclass(frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
+    dataclass = dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 else:
     from dataclasses import dataclass
-
-    dataclass(frozen=True)
 
 nl = "\n"
 
