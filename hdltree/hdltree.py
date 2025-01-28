@@ -80,8 +80,10 @@ class HdlParser:
             fpath = Path(fpath)
 
         ftype = ftype.upper()
-        if ftype not in ["VHDL", "VLOG"]:
-            ftype = filetype(fpath)
+        if isinstance(fpath, Path):
+            if ftype not in ["VHDL", "VLOG"]:
+                ftype = filetype(fpath)
+        assert ftype in ["VHDL", "VLOG"]
 
         if isinstance(fpath, Path):
             txt = fpath.read_text("latin-1")
@@ -122,7 +124,7 @@ class VerilogParser:
         #    VerilogCstTransformer, VerilogParseTreeTransformers.Tokens()
         # )
 
-    def parseFile(self, fpath: TextIOBase | Path | str, ftype: str = ""):
+    def parseFile(self, fpath: TextIOBase | Path | str):
         if isinstance(fpath, str):
             fpath = Path(fpath)
 
@@ -168,7 +170,7 @@ class VhdlParser:
             VhdlCstTransformer, VhdlParseTreeTransformers.Tokens()
         )
 
-    def parseFile(self, fpath: TextIOBase | Path | str, ftype: str = ""):
+    def parseFile(self, fpath: TextIOBase | Path | str):
         if isinstance(fpath, str):
             fpath = Path(fpath)
 
