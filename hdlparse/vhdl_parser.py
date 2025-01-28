@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set
 from hdltree.hdltree import VhdlParser
 from hdltree.VhdlCstTransformer import *
 
-VhdlParser = VhdlParser()
+parser = VhdlParser()
 
 class VhdlObject:
     """Base class for parsed VHDL objects
@@ -289,7 +289,7 @@ def parse_vhdl(text):
     Returns:
       Parsed objects.
     """
-    cst = VhdlParser.parse(text)
+    cst = parser.parse(text)
 
     objects = []
 
@@ -461,7 +461,7 @@ class VhdlExtractor:
       array_types(set): Initial array types
     """
 
-    def __init__(self, array_types: Set[str] = None):
+    def __init__(self, array_types: Set[str] | None = None):
         self.array_types = set(('std_ulogic_vector', 'std_logic_vector',
                                 'signed', 'unsigned', 'bit_vector'))
         if array_types:
