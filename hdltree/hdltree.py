@@ -264,7 +264,7 @@ def main():
     files = []
     for inpath in args.input:
         if inpath.is_file() and not is_excluded(inpath, args.exclude):
-            files = inpath
+            files.append(inpath)
         elif inpath.is_dir() and not is_excluded(inpath, args.exclude):
             for ext in vhdl_fileext:
                 for infile in inpath.rglob("**/*." + ext):

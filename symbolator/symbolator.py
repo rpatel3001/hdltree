@@ -771,10 +771,8 @@ def main():
 
             sym = make_symbol(comp, extractor, args.title, args.libname, args.no_type)
             if sym.draw(0, 0, nc):
-
                 nc.render(args.transparent)
-
-                print('Created {} from {} ({})'.format(fname, comp.name, source), file=sys.stderr)
+                print(f'Created {fname} from {comp.name} ({source})', file=sys.stderr)
     if args.component != "" and found_filter_component == 0:
         log.error(f"No diagrams were generated, because component {args.component} was not found")
         sys.exit(2)

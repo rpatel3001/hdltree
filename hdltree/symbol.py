@@ -4,7 +4,6 @@ import pydot
 from .VhdlCstTransformer import EntityDeclaration, InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration
 
 def to_symbol(ent: EntityDeclaration, with_generics=True, with_ports=True):
-
     if len(ent.generics) + len(ent.ports) == 0:
         return
 
@@ -104,4 +103,4 @@ def to_symbol(ent: EntityDeclaration, with_generics=True, with_ports=True):
         graphs = pydot.graph_from_dot_data(dotstr)
         graph = graphs[0]
         #print(graph.to_string())
-        graph.write_svg("output.svg")
+        graph.write_svg(f"{ent.identifier}.svg")
