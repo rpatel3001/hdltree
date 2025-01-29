@@ -372,18 +372,59 @@ def parse_vhdl(text):
             vobj = VhdlEntity(str(node.identifier), ports, generics)
             objects.append(vobj)
 
-#        elif isinstance(node, ComponentDeclaration):
-#            vobj = VhdlComponent(name, cur_package, ports, generics)
-#            objects.append(vobj)
-#
+        elif isinstance(node, ComponentDeclaration):
+            if genclause := node.local_generic_clause:
+                generics = []
+                for elem in genclause.interface_elements:
+                    decl = elem.generic_declaration
+                    for id in decl.identifier_list:
+                        default = None
+                        if decl.default:
+                            default = str(decl.default)
+                        if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                            ptype = VhdlParameterType(
+                                str(decl.subtype_indication.type_mark),
+                                decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                            )
+                        else:
+                            ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                        generics += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
+            else:
+                generics = None
+
+            ports = []
+            if portclause := node.local_port_clause:
+                for elem in portclause.interface_elements:
+                    decl = elem.port_declaration
+                    for id in decl.identifier_list:
+                        default = None
+                        if decl.default:
+                            default = str(decl.default)
+                        if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                            ptype = VhdlParameterType(
+                                str(decl.subtype_indication.type_mark),
+                                decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                            )
+                        else:
+                            ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                        ports += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
+            vobj = VhdlComponent(str(node.identifier), cur_package, ports, generics)
+            objects.append(vobj)
+
         elif isinstance(node, PackageDeclaration):
             cur_package = str(node.identifier)
-            objects.append(VhdlPackage(str(node.identifier)))
+            objects.append(VhdlPackage(cur_package))
 
-#        elif isinstance(node, TypeDeclaration):
-#            vobj = VhdlType(node.declaration.identifier, cur_package, action)
-#            objects.append(vobj)
-#
+        elif isinstance(node, (FullTypeDeclaration, SubtypeDeclaration)):
+            vobj = VhdlType(str(node.identifier), cur_package, str(node.children[1]))
+            objects.append(vobj)
+
         elif isinstance(node, SubtypeDeclaration):
             vobj = VhdlSubtype(str(node.identifier), cur_package, str(node.subtype_indication))
             objects.append(vobj)
