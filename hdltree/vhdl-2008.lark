@@ -352,8 +352,8 @@ attribute_name: prefix [ signature ] _SQUOTE attribute_designator [ _LPAREN expr
 
 attribute_specification: _ATTRIBUTE attribute_designator _OF entity_specification _IS expression _SEMICOLON
 
-// add word breaks before and after
-BASIC_IDENTIFIER: /\b/ LETTER ( [ UNDERLINE ] LETTER_OR_DIGIT )* /\b/
+// add word break after (can't do before because of physical literals with no space, ie 2.5ns)
+BASIC_IDENTIFIER: LETTER ( [ UNDERLINE ] LETTER_OR_DIGIT )* /\b/
 
 binding_indication: [ _USE entity_aspect ] [ generic_map_aspect ] [ port_map_aspect ]
 
@@ -541,7 +541,11 @@ decimal_literal: INTEGER [ _DOT INTEGER ] [ exponent ]
 delay_mechanism: TRANSPORT
     | [ _REJECT time_expression ] INERTIAL
 
-design_file: design_unit+
+// add branch for encrypted files (and MULTILINE_STRING)
+design_file: design_unit+ -> design_file
+    | ( tool_directive [ MULTILINE_STRING ] )+ -> encrypted_design_file
+
+MULTILINE_STRING: /.+/s
 
 design_unit: context_clause library_unit
 

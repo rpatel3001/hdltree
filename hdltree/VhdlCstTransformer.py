@@ -488,6 +488,7 @@ class Expression(_VhdlCstListNode):
     def format(self):
         return nonestr(self.conditional, post=" ") + str(self.expression)
 
+
 @dataclass
 class RangeLiteral(_VhdlCstNode):
     left: SimpleExpression
@@ -496,6 +497,7 @@ class RangeLiteral(_VhdlCstNode):
 
     def format(self):
         return f"{self.left} {self.direction} {self.right}"
+
 
 @dataclass
 class DiscreteRange(_VhdlCstNode):
@@ -615,7 +617,9 @@ class AttributeName(_VhdlCstNode):
     def format(self):
         return f"{self.prefix}{nonestr(self.signature)}'{self.attribute_designator}{nonestr(self.expression, pre='(', post=')')}"
 
+
 Range = AttributeName | RangeLiteral
+
 
 @dataclass
 class SliceName(_VhdlCstNode):
@@ -1462,7 +1466,7 @@ class FunctionSpecification(_VhdlCstNode):
     designator: Designator
     subprogram_header: SubprogramHeader | None
     PARAMETER: Token | None
-    formal_parameter_list: List[ParameterInterfaceElement]
+    formal_parameter_list: List[ParameterInterfaceElement] | None
     type_mark: TypeMark
 
     def format(self):
@@ -1607,6 +1611,15 @@ class SignalDeclaration(_VhdlCstNode):
 
 
 @dataclass
+class AttributeDeclaration(_VhdlCstNode):
+    identifier: Identifier
+    type_mark: TypeMark
+
+    def format(self):
+        return f"attribute {self.identifier} : {self.type_mark};"
+
+
+@dataclass
 class BlockDeclarativeItem(_VhdlCstNode):
     item: (
         SubprogramDeclaration
@@ -1622,6 +1635,8 @@ class BlockDeclarativeItem(_VhdlCstNode):
         | FileDeclaration
         | AliasDeclaration
         | ComponentDeclaration
+        | AttributeDeclaration
+        | AttributeSpecification
         | UseClause
     )
 
@@ -2230,3 +2245,20 @@ class DesignFile(_VhdlCstListNode):
 
     def format(self):
         return nonestr(self.design_units, sep=f"\n")
+
+
+@dataclass
+class ToolDirective(_VhdlCstNode):
+    identifier: Identifier
+    value: Token | None
+
+    def format(self):
+        return f"`{self.identifier}{nonestr(self.value, pre=' ')}"
+
+
+@dataclass
+class EncryptedDesignFile(_VhdlCstListNode):
+    directives: List[ToolDirective | Token]
+
+    def format(self):
+        return nonestr(self.directives, sep=f"\n")

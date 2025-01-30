@@ -54,7 +54,7 @@ def fix_pypy_console():
                             f.reconfigure(encoding=cur_encoding)
 
 
-vhdl_fileext = ["vhd", "vhdl", "vho", "vht"]
+vhdl_fileext = ["vhd", "vhdl", "vht"]
 vlog_fileext = ["v", "vh", "verilog", "vlg", "vo", "vqm", "vt", "veo", "sv", "svh", "vlog"]
 
 
