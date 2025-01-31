@@ -816,7 +816,7 @@ class InterfacePackageDeclaration(_VhdlCstNode):
 class InterfaceProcedureSpecification(_VhdlCstNode):
     designator: Designator
     PARAMETER: Token | None
-    formal_parameter_list: List[ParameterInterfaceElement]
+    formal_parameter_list: List[ParameterInterfaceElement] | None
 
     def format(self):
         return (
@@ -831,7 +831,7 @@ class InterfaceFunctionSpecification(_VhdlCstNode):
     pure: Token
     designator: Designator
     PARAMETER: Token | None
-    formal_parameter_list: List[ParameterInterfaceElement]
+    formal_parameter_list: List[ParameterInterfaceElement] | None
     type_mark: TypeMark
 
     def format(self):
@@ -894,7 +894,7 @@ class InterfaceFileDeclaration(_VhdlCstNode):
 
 @dataclass
 class FileOpenInformation(_VhdlCstNode):
-    open_kind: Token | None
+    open_kind: Expression | None
     name: Expression
 
     def format(self):
@@ -956,7 +956,23 @@ class PortClause(_VhdlCstListNode):
 
 @dataclass
 class EntityDeclarativeItem(_VhdlCstNode):
-    item: Token
+    item: (
+        SubprogramDeclaration
+        | SubprogramBody
+        | SubprogramInstantiationDeclaration
+        | PackageDeclaration
+        | PackageBody
+        | PackageInstantiationDeclaration
+        | TypeDeclaration
+        | SubtypeDeclaration
+        | ConstantDeclaration
+        | SignalDeclaration
+        | FileDeclaration
+        | AliasDeclaration
+        | AttributeDeclaration
+        | AttributeSpecification
+        | UseClause
+    )
 
     def format(self):
         return f"{self.item}"
@@ -1450,7 +1466,7 @@ class ProcedureSpecification(_VhdlCstNode):
     designator: Designator
     subprogram_header: SubprogramHeader | None
     PARAMETER: Token | None
-    formal_parameter_list: List[ParameterInterfaceElement]
+    formal_parameter_list: List[ParameterInterfaceElement] | None
 
     def format(self):
         return (
