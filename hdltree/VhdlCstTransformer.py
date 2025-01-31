@@ -828,7 +828,7 @@ class InterfaceProcedureSpecification(_VhdlCstNode):
 
 @dataclass
 class InterfaceFunctionSpecification(_VhdlCstNode):
-    pure: Token
+    pure: Token | None
     designator: Designator
     PARAMETER: Token | None
     formal_parameter_list: List[ParameterInterfaceElement] | None
@@ -1545,6 +1545,8 @@ class PackageDeclarativeItem(_VhdlCstNode):
     item: (
         SubprogramDeclaration
         | SubprogramInstantiationDeclaration
+        | PackageDeclaration
+        | PackageInstantiationDeclaration
         | TypeDeclaration
         | SubtypeDeclaration
         | ConstantDeclaration
@@ -1553,6 +1555,8 @@ class PackageDeclarativeItem(_VhdlCstNode):
         | FileDeclaration
         | AliasDeclaration
         | ComponentDeclaration
+        | AttributeDeclaration
+        | AttributeSpecification
         | UseClause
     )
 
@@ -1876,14 +1880,14 @@ class IfStatement(_VhdlCstNode):
     label: Identifier | None
     condition: Expression
     if_branch_statements: List[SequentialStatement]
-    elsif_branches: List[Expression | List[SequentialStatement]] | None
+    elsif_branches: List[Expression | List[SequentialStatement]]
     else_branch_statements: List[SequentialStatement] | None
     label_end: Identifier | None
 
     def format(self):
         elsif = (
             []
-            if self.elsif_branches is None
+            if not self.elsif_branches
             else [
                 f"elsif {c} then\n{nonestr(s, sep=nl)}"
                 for c, s in zip(self.elsif_branches[0::2], self.elsif_branches[1::2])
@@ -2053,6 +2057,25 @@ class ReportStatement(_VhdlCstNode):
         return f"{nonestr(self.label, post=': ')}report {self.expression}{nonestr(self.severity, pre=' severity ')};"
 
 
+
+@dataclass
+class NextStatement(_VhdlCstNode):
+    label: Identifier | None
+    loop_label: Identifier | None
+    condition: Expression | None
+
+    def format(self):
+        return f"{nonestr(self.label, post=': ')}next{nonestr(self.loop_label, pre=' ')}{nonestr(self.condition, pre=' when ')};"
+
+
+@dataclass
+class NullStatement(_VhdlCstNode):
+    label: Identifier | None
+
+    def format(self):
+        return f"{nonestr(self.label, post=': ')}null;"
+
+
 @dataclass
 class SequentialStatement(_VhdlCstNode):
     item: (
@@ -2063,10 +2086,12 @@ class SequentialStatement(_VhdlCstNode):
         | VariableAssignmentStatement
         | ProcedureCallStatement
         | IfStatement
-        | LoopStatement
         | CaseStatement
+        | LoopStatement
+        | NextStatement
         | ExitStatement
         | ReturnStatement
+        | NullStatement
     )
 
     def format(self):
@@ -2141,8 +2166,170 @@ class ComponentInstantiationStatement(_VhdlCstNode):
 
 
 @dataclass
+class BlockHeader(_VhdlCstNode):
+    generic_clause: GenericClause | None
+    generic_map_aspect: GenericMapAspect | None
+    port_clause: PortClause | None
+    port_map_aspect: PortMapAspect | None
+
+    def format(self):
+        return (
+            nonestr(self.generic_clause)
+            + nonestr(self.generic_map_aspect, post=";")
+            + nonestr(self.port_clause)
+            + nonestr(self.port_map_aspect, post=";")
+        )
+
+
+@dataclass
+class BlockStatement(_VhdlCstNode):
+    label: Identifier
+    guard_condition: Expression | None
+    IS: Token | None
+    block_header: BlockHeader
+    block_declarative_part: List[BlockDeclarativeItem]
+    block_statement_part: List[ConcurrentStatement]
+    label_end: Identifier | None
+
+    def format(self):
+        return (
+            f"{self.label}: block"
+            + nonestr(self.guard_condition, pre=" (", post=")")
+            + nonestr(self.IS, pre=" ")
+            + "\n"
+            + nonestr(self.block_header)
+            + nonestr(self.block_declarative_part, sep="\n")
+            + "\nbegin\n"
+            + nonestr(self.block_statement_part, sep="\n")
+            + "\nend block"
+            + nonestr(self.label_end, pre=" ")
+            + ";"
+        )
+
+
+@dataclass
+class GenerateStatementBody(_VhdlCstNode):
+    block_declarative_part: List[BlockDeclarativeItem] | None
+    block_statement_part: List[ConcurrentStatement]
+    alternative_label: Identifier | None
+
+    def format(self):
+        return (
+            nonestr(self.block_declarative_part, sep="\n", post=" begin")
+            + nonestr(self.block_statement_part, sep="\n", end="\n")
+            + nonestr(self.alternative_label, pre="end ", post=";")
+        )
+
+
+@dataclass
+class ForGenerateStatement(_VhdlCstNode):
+    label: Identifier
+    generate_parameter_specification: ParameterSpecification
+    generate_statement_body: GenerateStatementBody
+    label_end: Identifier | None
+
+    def format(self):
+        return (
+            f"{self.label}: for {self.generate_parameter_specification} generate\n"
+            + f"{self.generate_statement_body}\nend generate{nonestr(self.label_end, post=' ')};"
+        )
+
+
+@dataclass
+class IfGenerateStatement(_VhdlCstNode):
+    label: Identifier
+    if_label: Identifier | None
+    condition: Expression
+    if_body: GenerateStatementBody
+    elsif_branches: List[Identifier | Expression | GenerateStatementBody]
+    else_label: Identifier | None
+    else_body: GenerateStatementBody | None
+    label_end: Identifier | None
+
+    def format(self):
+        elsif = (
+            []
+            if not self.elsif_branches
+            else [
+                f"elsif {nonestr(l, post=": ")}{c} generate\n{nonestr(b, sep=nl)}"
+                for l, c, b in zip(self.elsif_branches[0::3], self.elsif_branches[1::3], self.elsif_branches[2::3])
+            ]
+        )
+        return (
+            f"{self.label}: if"
+            + nonestr(self.if_label, post=": ")
+            + f"{self.condition} generate\n{self.if_body}\n"
+            + nonestr(elsif, sep="\n", post="\n")
+            + nonestr(self.else_body, pre=f"else {self.else_label} generate\n")
+            + f"end generate{nonestr(self.label_end, pre=' ')};"
+        )
+
+
+@dataclass
+class CaseGenerateAlternative(_VhdlCstNode):
+    label: Identifier
+    choices: Choices
+    body: GenerateStatementBody
+
+    def format(self):
+        return (
+            f"when {nonestr(self.label, post=": ")}{self.choices} => {self.body}"
+        )
+
+
+@dataclass
+class CaseGenerateStatement(_VhdlCstNode):
+    label: Identifier
+    expression: Expression
+    alternatives: List[CaseGenerateAlternative]
+    label_end: Identifier
+
+    def format(self):
+        return (
+            f"{self.label}: case {self.expression} generate\n"
+            + nonestr(self.alternatives, sep='\n', post='\n')
+            + f"end generate{nonestr(self.label_end, pre=' ')};"
+        )
+
+
+@dataclass
+class ConcurrentProcedureCallStatement(_VhdlCstNode):
+    label: Identifier | None
+    POSTPONED: Token | None
+    procedure_call: ProcedureCall
+
+    def format(self):
+        return (
+            nonestr(self.label, post=": ") + nonestr(self.POSTPONED, post=' ') + str(self.procedure_call) + ";"
+        )
+
+
+@dataclass
+class ConcurrentAssertionStatement(_VhdlCstNode):
+    label: Identifier | None
+    POSTPONED: Token | None
+    assertion: Assertion
+
+    def format(self):
+        return (
+            nonestr(self.label, post=": ") + nonestr(self.POSTPONED, post=' ') + str(self.assertion) + ";"
+        )
+
+
+GenerateStatement = ForGenerateStatement | IfGenerateStatement | CaseGenerateStatement
+
+
+@dataclass
 class ConcurrentStatement(_VhdlCstNode):
-    item: ProcessStatement | ConcurrentSignalAssignmentStatement | ComponentInstantiationStatement
+    item: (
+        BlockStatement
+        | ProcessStatement
+        | ConcurrentProcedureCallStatement
+        | ConcurrentAssertionStatement
+        | ConcurrentSignalAssignmentStatement
+        | ComponentInstantiationStatement
+        | GenerateStatement
+    )
 
     def format(self):
         return str(self.item)

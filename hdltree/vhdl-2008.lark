@@ -721,7 +721,7 @@ generate_specification: static_discrete_range
     | static_expression
     | alternative_label
 
-generate_statement: for_generate_statement
+?generate_statement: for_generate_statement
     | if_generate_statement
     | case_generate_statement
 
@@ -776,7 +776,9 @@ identifier: BASIC_IDENTIFIER
 
 identifier_list: identifier ( _COMMA identifier )* -> as_list
 
-if_generate_statement: generate_label _COLON _IF [ alternative_label _COLON ] condition _GENERATE generate_statement_body ( _ELSIF [ alternative_label _COLON ] condition _GENERATE generate_statement_body )* [ _ELSE [ alternative_label _COLON ] _GENERATE generate_statement_body ] _END _GENERATE [ generate_label ] _SEMICOLON
+// pull out list
+generate_elsif_list: ( _ELSIF [ alternative_label _COLON ] condition _GENERATE generate_statement_body )* -> as_list
+if_generate_statement: generate_label _COLON _IF [ alternative_label _COLON ] condition _GENERATE generate_statement_body generate_elsif_list [ _ELSE [ alternative_label _COLON ] _GENERATE generate_statement_body ] _END _GENERATE [ generate_label ] _SEMICOLON
 
 // pull out list
 elsif_list: ( _ELSIF condition _THEN sequence_of_statements )* -> as_list

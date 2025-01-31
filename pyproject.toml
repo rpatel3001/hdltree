@@ -1,6 +1,6 @@
 [project]
 name = "hdltree"
-version = "0.3.1"
+version = "0.3.2"
 authors = [{ name = "Rajan Patel", email = "rpatel3001@gmail.com" }]
 readme = "README.md"
 classifiers = [
