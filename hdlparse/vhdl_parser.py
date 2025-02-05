@@ -292,6 +292,7 @@ def parse_vhdl(text):
     cst = parser.parse(text)
 
     objects = []
+    cur_package = "defaultpkg"
 
     for node in cst.iter_subtrees_topdown():
         if isinstance(node, SubprogramDeclaration):
