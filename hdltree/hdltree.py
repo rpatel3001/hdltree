@@ -4,7 +4,7 @@ from pathlib import Path
 from json import dumps, loads
 from lark import Lark, logger, ast_utils
 from lark_ambig_tools import CountTrees
-from lark.exceptions import UnexpectedCharacters
+from lark.exceptions import UnexpectedCharacters, VisitError
 from rich import print as richprint
 from argparse import ArgumentParser
 from io import StringIO, TextIOBase
@@ -284,10 +284,14 @@ def main():
             print("from rules:")
             print(e.considered_rules)
             print()
+        except VisitError as e:
+            print(e)
+            errjson = e.__context__.json()
+            print(dumps(loads(errjson), indent=2))
         except Exception as e:
             print(e)
 
-        lines = f.read_text().count("\n")
+        lines = f.read_text("latin-1").count("\n")
         elapsed = time() - prev
         print(
             f"\ranalyzed {f} ({lines} lines) in {elapsed:.2f} seconds ({lines/elapsed:.2f} lines/sec)"

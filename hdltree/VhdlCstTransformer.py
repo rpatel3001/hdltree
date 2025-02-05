@@ -3,7 +3,7 @@ from __future__ import annotations  # for forward annotations
 from sys import modules
 from os import getenv
 from types import SimpleNamespace
-from typing import List, Optional
+from typing import List, Optional, TypeAlias
 from lark import ast_utils, Token, Tree
 from lark.tree import Meta
 from dataclasses import InitVar, fields
@@ -500,6 +500,28 @@ class RangeLiteral(_VhdlCstNode):
 
 
 @dataclass
+class AttributeName(_VhdlCstNode):
+    prefix: Prefix
+    signature: Signature | None
+    attribute_designator: Identifier
+    expression: Expression | None
+
+    def format(self):
+        return f"{self.prefix}{nonestr(self.signature)}'{self.attribute_designator}{nonestr(self.expression, pre='(', post=')')}"
+
+
+@dataclass
+class RangeAttributeName(_VhdlCstNode):
+    range_attribute: AttributeName
+
+    def format(self):
+        return format(self.range_attribute)
+
+
+Range: TypeAlias = RangeAttributeName | RangeLiteral
+
+
+@dataclass
 class DiscreteRange(_VhdlCstNode):
     range: SubtypeIndication | Range
 
@@ -608,26 +630,101 @@ class IndexedName(_VhdlCstNode):
 
 
 @dataclass
-class AttributeName(_VhdlCstNode):
-    prefix: Prefix
-    signature: Signature | None
-    attribute_designator: Identifier
-    expression: Expression | None
-
-    def format(self):
-        return f"{self.prefix}{nonestr(self.signature)}'{self.attribute_designator}{nonestr(self.expression, pre='(', post=')')}"
-
-
-Range = AttributeName | RangeLiteral
-
-
-@dataclass
 class SliceName(_VhdlCstNode):
     prefix: Prefix
     discrete_range: DiscreteRange
 
     def format(self):
         return f"{self.prefix}({self.discrete_range})"
+
+
+@dataclass
+class PackagePathname(_VhdlCstNode):
+    library_logical_name: Identifier
+    package_simple_name_list: List[Identifier]
+    object_simple_name: Identifier
+
+    def format(self):
+        return f"at {self.library_logical_name}.{nonestr(self.package_simple_name_list, sep='.', post='.')}{self.object_simple_name}"
+
+
+@dataclass
+class PathnameElementGenerate(_VhdlCstNode):
+    generate_statement_label: Identifier
+    static_expression: Expression | None
+
+    def format(self):
+        return f"{self.generate_statement_label}{nonestr(self.static_expression, pre='(', post=')')}"
+
+
+@dataclass
+class PathnameElementBare(_VhdlCstNode):
+    id: Identifier
+
+    def format(self):
+        return str(self.id)
+
+
+PathnameElement: TypeAlias = PathnameElementBare | PathnameElementGenerate
+
+
+@dataclass
+class PartialPathname(_VhdlCstNode):
+    pathname_element_list: List[PathnameElement]
+    object_simple_name: Identifier
+
+    def format(self):
+        return f"{nonestr(self.pathname_element_list, sep='.', post='.')}{self.object_simple_name}"
+
+
+@dataclass
+class AbsolutePathname(_VhdlCstNode):
+    partial_pathname: PartialPathname
+
+    def format(self):
+        return f".{self.partial_pathname}"
+
+
+@dataclass
+class RelativePathname(_VhdlCstNode):
+    relative_levels: List[Token]
+    partial_pathname: PartialPathname
+
+    def format(self):
+        return f".{self.partial_pathname}"
+
+
+ExternalPathname: TypeAlias = PackagePathname | AbsolutePathname | RelativePathname
+
+
+@dataclass
+class ExternalConstantName(_VhdlCstNode):
+    external_pathname: ExternalPathname
+    subtype_indication: SubtypeIndication
+
+    def format(self):
+        return f"<< constant {self.external_pathname} : {self.subtype_indication} >>"
+
+
+@dataclass
+class ExternalSignalName(_VhdlCstNode):
+    external_pathname: ExternalPathname
+    subtype_indication: SubtypeIndication
+
+    def format(self):
+        return f"<< signal {self.external_pathname} : {self.subtype_indication} >>"
+
+
+@dataclass
+class ExternalVariableName(_VhdlCstNode):
+    external_pathname: ExternalPathname
+    subtype_indication: SubtypeIndication
+
+    def format(self):
+        return f"<< variable {self.external_pathname} : {self.subtype_indication} >>"
+
+
+ExternalName: TypeAlias = ExternalConstantName | ExternalSignalName | ExternalVariableName
 
 
 @dataclass
@@ -640,6 +737,7 @@ class Name(_VhdlCstNode):
         | IndexedName
         | SliceName
         | AttributeName
+        | ExternalName
     )
 
     def format(self):
@@ -967,6 +1065,7 @@ class EntityDeclarativeItem(_VhdlCstNode):
         | SubtypeDeclaration
         | ConstantDeclaration
         | SignalDeclaration
+        | VariableDeclaration
         | FileDeclaration
         | AliasDeclaration
         | AttributeDeclaration
@@ -980,7 +1079,7 @@ class EntityDeclarativeItem(_VhdlCstNode):
 
 @dataclass
 class EntityStatement(_VhdlCstNode):
-    item: Token
+    item: ConcurrentAssertionStatement
 
     def format(self):
         return f"{self.item}"
@@ -1046,16 +1145,8 @@ class ComponentDeclaration(_VhdlCstNode):
 
 
 @dataclass
-class LogicalName(_VhdlCstNode):
-    identifier: Identifier
-
-    def format(self):
-        return str(self.identifier)
-
-
-@dataclass
 class LibraryClause(_VhdlCstListNode):
-    logical_names: List[LogicalName]
+    logical_names: List[Identifier]
 
     def format(self):
         return "library " + nonestr(self.logical_names, sep=f", ") + ";"
@@ -1089,29 +1180,23 @@ class ContextClause(_VhdlCstListNode):
 
 
 @dataclass
-class FormalPart(_VhdlCstListNode):
-    _list: InitVar[tuple[Name] | tuple[Identifier | TypeMark, Name]]
-    formal: Optional[Name] = None
-    function_name: Optional[Identifier] = None
-    type: Optional[TypeMark] = None
-
-    def __post_init__(self, _list):
-        if isinstance(_list[0], Name):
-            super().__setattr__("formal", _list[0])
-        elif isinstance(_list[0], Identifier):
-            super().__setattr__("function_name", _list[0])
-            super().__setattr__("formal", _list[1])
-        else:
-            super().__setattr__("type", _list[0])
-            super().__setattr__("formal", _list[1])
+class FormalPartNameOnly(_VhdlCstNode):
+    formal: Name
 
     def format(self):
-        if self.function_name:
-            return f"{self.function_name}({self.formal})"
-        elif self.type:
-            return f"{self.type}({self.formal})"
-        else:
-            return f"{self.formal}"
+        return f"{self.formal}"
+
+
+@dataclass
+class FormalPartWithConversion(_VhdlCstNode):
+    converter: Name | TypeMark
+    formal: Name
+
+    def format(self):
+        return f"{self.converter}({self.formal})"
+
+
+FormalPart: TypeAlias = FormalPartNameOnly | FormalPartWithConversion
 
 
 @dataclass
@@ -1271,9 +1356,32 @@ class EnumerationTypeDefinition(_VhdlCstListNode):
         return nonestr(self.literals, sep=", ", pre="(", post=")")
 
 
+PrimaryUnitDeclaration: TypeAlias = Identifier
+
+@dataclass
+class SecondaryUnitDeclaration(_VhdlCstNode):
+    identifier: Identifier
+    literal: PhysicalLiteral
+
+    def format(self):
+        return f"{self.identifier} = {self.literal};"
+
+@dataclass
+class PhysicalTypeDefinition(_VhdlCstNode):
+    range_constraint: RangeConstraint
+    primary_unit_declaration: PrimaryUnitDeclaration
+    secondary_units: List[SecondaryUnitDeclaration]
+    physical_type_simple_name: Identifier | None
+
+    def format(self):
+        return f"{self.range_constraint} units {self.primary_unit_declaration};\n{nonestr(self.secondary_units, sep=nl)}\nend units{nonestr(self.physical_type_simple_name, pre=' ')}"
+
+IntegerTypeDefinition: TypeAlias = RangeConstraint
+FloatingTypeDefinition: TypeAlias = RangeConstraint
+
 @dataclass
 class ScalarTypeDefinition(_VhdlCstNode):
-    definition: EnumerationTypeDefinition
+    definition: EnumerationTypeDefinition | IntegerTypeDefinition | FloatingTypeDefinition | PhysicalTypeDefinition
 
     def format(self):
         return str(self.definition)
@@ -1590,16 +1698,131 @@ class ContextDeclaration(_VhdlCstNode):
 class PackageInstantiationDeclaration(_VhdlCstNode):
     identifier: Identifier
     uninstantiated_package_name: Name
-    generic_map_aspect: GenericMapAspect
+    generic_map_aspect: GenericMapAspect | None
 
     def format(self):
         return f"package {self.identifier} is new {self.uninstantiated_package_name}{nonestr(self.generic_map_aspect, pre=' ')};"
+
+ConfigurationDeclarativeItem: TypeAlias = UseClause | AttributeSpecification
+
+
+@dataclass
+class VerificationUnitBindingIndication(_VhdlCstNode):
+    unit_list: List[Name]
+
+    def format(self):
+        return ", ".join([f"use vunit {u}" for u in self.unit_list])
+
+
+GenerateSpecification: TypeAlias = DiscreteRange | Expression | Identifier
+
+
+@dataclass
+class BlockSpecificationBare(_VhdlCstNode):
+    id: Name | Identifier
+
+    def format(self):
+        return format(self.id)
+
+
+@dataclass
+class BlockSpecificationGenerate(_VhdlCstNode):
+    generate_statement_label: Identifier
+    generate_specification: GenerateSpecification
+
+    def format(self):
+        return ", ".join([f"use vunit {u}" for u in self.unit_list])
+
+
+BlockSpecification: TypeAlias = BlockSpecificationBare | BlockSpecificationGenerate
+
+
+@dataclass
+class BlockConfiguration(_VhdlCstNode):
+    block_specification: BlockSpecification
+    use_clause_list: List[UseClause]
+    configuration_item_list: List[ConfigurationItem]
+
+    def format(self):
+        return f"for {self.block_specification}\n{nonestr(self.use_clause_list, sep=' ')}\n{nonestr(self.configuration_item_list, sep=' ')}\nend for;"
+
+
+InstantiationList: TypeAlias = List[Identifier] | Token
+
+
+@dataclass
+class ComponentSpecification(_VhdlCstNode):
+    instantiation_list: InstantiationList
+    name: Name
+
+    def format(self):
+        return f"{self.instantiation_list} : {self.name}"
+
+
+@dataclass
+class EntityAspectWithArch(_VhdlCstNode):
+    entity_name: Name
+    architecture: Identifier | None
+
+    def format(self):
+        return f"entity {self.entity_name}{nonestr(self.architecture, pre='(', post=')')}"
+
+
+@dataclass
+class EntityAspectConfiguration(_VhdlCstNode):
+    configuration: Name
+
+    def format(self):
+        return f"configuration {self.configuration}"
+
+
+EntityAspectOpen: TypeAlias = Token
+EntityAspect: TypeAlias = EntityAspectWithArch | EntityAspectConfiguration | EntityAspectOpen
+
+
+@dataclass
+class BindingIndication(_VhdlCstNode):
+    entity: EntityAspect | None
+    generic: GenericMapAspect | None
+    port: PortMapAspect | None
+
+    def format(self):
+        return f"{nonestr(self.entity, pre='use ')}\n{nonestr(self.generic)}\n{nonestr(self.port)}"
+
+
+@dataclass
+class ComponentConfiguration(_VhdlCstNode):
+    component_specification: ComponentSpecification
+    binding_indication: BindingIndication | None
+    verification_units: List[VerificationUnitBindingIndication]
+    block_configuration: BlockConfiguration | None
+
+    def format(self):
+        return f"for {self.component_specification}\n{nonestr(self.binding_indication, post=f';{nl}')}{nonestr(self.verification_units, sep=f';{nl}', post=f';{nl}')}{nonestr(self.block_configuration, post=nl)}\nend for;"
+
+
+ConfigurationItem: TypeAlias = BlockConfiguration | ComponentConfiguration
+
+
+@dataclass
+class ConfigurationDeclaration(_VhdlCstNode):
+    identifier: Identifier
+    entity_name: Name
+    declarative_part: List[ConfigurationDeclarativeItem]
+    verification_units: List[VerificationUnitBindingIndication]
+    block_configuration: BlockConfiguration
+    CONFIGURATION: Token | None
+    simple_name: Identifier | None
+
+    def format(self):
+        return f"configuration {self.identifier} of {self.entity_name} is {nonestr(self.declarative_part, sep=' ')}\n{nonestr(self.verification_units, sep=f';{nl}', post=f';{nl}')}{self.block_configuration}\nend{nonestr(self.CONFIGURATION, pre=' ')}{nonestr(self.simple_name, pre=' ')};"
 
 
 @dataclass
 class PrimaryUnit(_VhdlCstNode):
     unit: (
         EntityDeclaration
+        | ConfigurationDeclaration
         | PackageDeclaration
         | PackageInstantiationDeclaration
         | ContextDeclaration
@@ -1640,6 +1863,30 @@ class AttributeDeclaration(_VhdlCstNode):
 
 
 @dataclass
+class SimpleConfigurationSpecification(_VhdlCstNode):
+    component_specification: ComponentSpecification
+    binding_indication: BindingIndication
+    FOR: Token | None
+
+    def format(self):
+        return f"for {self.component_specification}\n{self.binding_indication};{nonestr(self.FOR, pre=f'{nl}end ', post=';')}"
+
+
+@dataclass
+class CompoundConfigurationSpecification(_VhdlCstNode):
+    component_specification: ComponentSpecification
+    binding_indication: BindingIndication
+    verification_unit_binding_indication: VerificationUnitBindingIndication
+    verification_units: List[VerificationUnitBindingIndication]
+
+    def format(self):
+        return f"for {self.component_specification}\n{self.binding_indication};\n{self.verification_unit_binding_indication};\n{nonestr(self.verification_units, sep=f';{nl}', post=f';{nl}')}\nend for;"
+
+
+ConfigurationSpecification: TypeAlias = SimpleConfigurationSpecification | CompoundConfigurationSpecification
+
+
+@dataclass
 class BlockDeclarativeItem(_VhdlCstNode):
     item: (
         SubprogramDeclaration
@@ -1652,11 +1899,13 @@ class BlockDeclarativeItem(_VhdlCstNode):
         | SubtypeDeclaration
         | ConstantDeclaration
         | SignalDeclaration
+        | VariableDeclaration
         | FileDeclaration
         | AliasDeclaration
         | ComponentDeclaration
         | AttributeDeclaration
         | AttributeSpecification
+        | ConfigurationSpecification
         | UseClause
     )
 
@@ -1680,16 +1929,6 @@ class Waveform(_VhdlCstListNode):
     def format(self):
         return nonestr(self.element, sep=", ")
 
-
-@dataclass
-class SelectedWaveforms(_VhdlCstListNode):
-    selections: List[Waveform | Choices]
-
-    def format(self):
-        vec = [f"{w} when {c}" for w, c in zip(self.selections[0::2], self.selections[1::2])]
-        return nonestr(vec, sep=f",\n")
-
-
 @dataclass
 class ConcurrentSelectedSignalAssignment(_VhdlCstNode):
     expression: Expression
@@ -1697,7 +1936,7 @@ class ConcurrentSelectedSignalAssignment(_VhdlCstNode):
     target: Target
     GUARDED: Token | None
     delay_mechanism: DelayMechanism | None
-    selected_waveforms: SelectedWaveforms
+    selected_waveforms: List[Waveform | Choices]
 
     def format(self):
         return (
@@ -1705,7 +1944,7 @@ class ConcurrentSelectedSignalAssignment(_VhdlCstNode):
             + f"{self.target} <= "
             + nonestr(self.GUARDED, post=" ")
             + nonestr(self.delay_mechanism, post=" ")
-            + f"\n{self.selected_waveforms};"
+            + f"\n{nonestr(self.selected_waveforms, sep=f',{nl}')};"
         )
 
 
@@ -1830,6 +2069,26 @@ class SimpleForceAssignment(_VhdlCstNode):
 
 
 @dataclass
+class ConditionalWaveformAssignment(_VhdlCstNode):
+    target: Target
+    delay: DelayMechanism | None
+    waveform: ConditionalWaveforms
+
+    def format(self):
+        return f"{self.target} <= {nonestr(self.delay, post=' ')}{self.waveform};"
+
+
+@dataclass
+class ConditionalForceAssignment(_VhdlCstNode):
+    target: Target
+    force_mode: Token | None
+    expression: ConditionalWaveforms
+
+    def format(self):
+        return f"{self.target} <= force {nonestr(self.force_mode, post=' ')}{self.expression};"
+
+
+@dataclass
 class SimpleReleaseAssignment(_VhdlCstNode):
     target: Target
     force_mode: Token | None
@@ -1845,11 +2104,55 @@ class SimpleSignalAssignment(_VhdlCstNode):
     def format(self):
         return str(self.item)
 
+ConditionalSignalAssignment: TypeAlias = ConditionalWaveformAssignment | ConditionalForceAssignment
+
+
+@dataclass
+class SelectedWaveformAssignment(_VhdlCstNode):
+    expression: Expression
+    QMARK: Token | None
+    target: Target
+    delay_mechanism: DelayMechanism
+    selected_waveforms: List[Expression | Choices]
+
+    def format(self):
+        selexpr = (
+            []
+            if not self.selected_waveforms
+            else [
+                f"{w} when {c}"
+                for w, c in zip(self.selected_waveforms[0::2], self.selected_waveforms[1::2])
+            ]
+        )
+        return f"with {self.expression} select{nonestr(self.QMARK, pre=' ')} {self.target} <={nonestr(self.delay_mechanism, pre=' ')} {nonestr(selexpr, sep=', ')};"
+
+
+@dataclass
+class SelectedForceAssignment(_VhdlCstNode):
+    expression: Expression
+    QMARK: Token | None
+    target: Target
+    force_mode: Token | None
+    selected_expressions: List[Expression | Choices]
+
+    def format(self):
+        selexpr = (
+            []
+            if not self.selected_expressions
+            else [
+                f"{e} when {c}"
+                for e, c in zip(self.selected_expressions[0::2], self.selected_expressions[1::2])
+            ]
+        )
+        return f"with {self.expression} select{nonestr(self.QMARK, pre=' ')} {self.target} <= force{nonestr(self.force_mode, pre=' ')} {nonestr(selexpr, sep=', ')};"
+
+
+SelectedSignalAssignment: TypeAlias = SelectedWaveformAssignment | SelectedForceAssignment
 
 @dataclass
 class SignalAssignmentStatement(_VhdlCstNode):
     label: Identifier | None
-    assignment: SimpleSignalAssignment  # | ConditionalSignalAssignment | SelectedSignalAssignment
+    assignment: SimpleSignalAssignment | ConditionalSignalAssignment | SelectedSignalAssignment
 
     def format(self):
         return f"{nonestr(self.label, post=': ')}{self.assignment}"
@@ -1865,10 +2168,57 @@ class SimpleVariableAssignment(_VhdlCstNode):
 
 
 @dataclass
+class ConditionalExpression(_VhdlCstNode):
+    when_expr: Expression
+    condition: Expression
+    else_list: List[Expression]
+    else_expr: Expression | None
+
+    def format(self):
+        elsif = (
+            []
+            if not self.else_list
+            else [
+                f"else {e} when {c}"
+                for e, c in zip(self.else_list[0::2], self.else_list[1::2])
+            ]
+        )
+        return f"{self.when_expr} when {self.condition}{nonestr(elsif, sep=nl, pre=' ', post=nl)}{nonestr(self.else_expr, pre=' else ')};"
+
+
+@dataclass
+class ConditionalVariableAssignment(_VhdlCstNode):
+    target: Target
+    expression: ConditionalExpression
+
+    def format(self):
+        return f"{self.target} := {self.expression};"
+
+
+@dataclass
+class SelectedVariableAssignment(_VhdlCstNode):
+    expression: Expression
+    QMARK: Token | None
+    target: Target
+    selected_expressions: List[Expression | Choices]
+
+    def format(self):
+        selexpr = (
+            []
+            if not self.selected_expressions
+            else [
+                f"{e} when {c}"
+                for e, c in zip(self.selected_expressions[0::2], self.selected_expressions[1::2])
+            ]
+        )
+        return f"with {self.expression} select{nonestr(self.QMARK, pre=' ')} {self.target} := {nonestr(selexpr, sep=', ')};"
+
+
+@dataclass
 class VariableAssignmentStatement(_VhdlCstNode):
     label: Identifier | None
     assignment: (
-        SimpleVariableAssignment  # | ConditionalVariableAssignment | SelectedVariableAssignment
+        SimpleVariableAssignment | ConditionalVariableAssignment | SelectedVariableAssignment
     )
 
     def format(self):
@@ -2146,7 +2496,7 @@ class InstantiatedConfiguration(_VhdlCstNode):
         return f"configuration {self.component_name}"
 
 
-InstantiatedUnit = InstantiatedComponent | InstantiatedEntity | InstantiatedConfiguration
+InstantiatedUnit: TypeAlias = InstantiatedComponent | InstantiatedEntity | InstantiatedConfiguration
 
 
 @dataclass
@@ -2241,7 +2591,7 @@ class IfGenerateStatement(_VhdlCstNode):
     if_label: Identifier | None
     condition: Expression
     if_body: GenerateStatementBody
-    elsif_branches: List[Identifier | Expression | GenerateStatementBody]
+    elsif_branches: List[Identifier | Expression | GenerateStatementBody | None]
     else_label: Identifier | None
     else_body: GenerateStatementBody | None
     label_end: Identifier | None
@@ -2251,7 +2601,7 @@ class IfGenerateStatement(_VhdlCstNode):
             []
             if not self.elsif_branches
             else [
-                f"elsif {nonestr(l, post=": ")}{c} generate\n{nonestr(b, sep=nl)}"
+                f"elsif {nonestr(l, post=': ')}{c} generate\n{nonestr(b, sep=nl)}"
                 for l, c, b in zip(self.elsif_branches[0::3], self.elsif_branches[1::3], self.elsif_branches[2::3])
             ]
         )
@@ -2273,7 +2623,7 @@ class CaseGenerateAlternative(_VhdlCstNode):
 
     def format(self):
         return (
-            f"when {nonestr(self.label, post=": ")}{self.choices} => {self.body}"
+            f"when {nonestr(self.label, post=': ')}{self.choices} => {self.body}"
         )
 
 
@@ -2316,7 +2666,7 @@ class ConcurrentAssertionStatement(_VhdlCstNode):
         )
 
 
-GenerateStatement = ForGenerateStatement | IfGenerateStatement | CaseGenerateStatement
+GenerateStatement: TypeAlias = ForGenerateStatement | IfGenerateStatement | CaseGenerateStatement
 
 
 @dataclass
@@ -2335,8 +2685,8 @@ class ConcurrentStatement(_VhdlCstNode):
         return str(self.item)
 
 
-ArchitectureDeclarativePart = List[BlockDeclarativeItem]
-ArchitectureStatementPart = List[ConcurrentStatement]
+ArchitectureDeclarativePart: TypeAlias = List[BlockDeclarativeItem]
+ArchitectureStatementPart: TypeAlias = List[ConcurrentStatement]
 
 
 @dataclass
@@ -2374,12 +2724,14 @@ class DeclarativeItem(_VhdlCstNode):
         | SubprogramBody
         | PackageDeclaration
         | PackageBody
+        | PackageInstantiationDeclaration
         | TypeDeclaration
         | SubtypeDeclaration
         | ConstantDeclaration
         | VariableDeclaration
         | FileDeclaration
         | AliasDeclaration
+        | AttributeDeclaration
         | AttributeSpecification
         | UseClause
     )
@@ -2388,10 +2740,10 @@ class DeclarativeItem(_VhdlCstNode):
         return str(self.item)
 
 
-SubprogramDeclarativeItem = DeclarativeItem
-PackageBodyDeclarativeItem = DeclarativeItem
-ProcessDeclarativeItem = DeclarativeItem
-ProtectedTypeBodyDeclarativeItem = DeclarativeItem
+SubprogramDeclarativeItem: TypeAlias = DeclarativeItem
+PackageBodyDeclarativeItem: TypeAlias = DeclarativeItem
+ProcessDeclarativeItem: TypeAlias = DeclarativeItem
+ProtectedTypeBodyDeclarativeItem: TypeAlias = DeclarativeItem
 
 
 @dataclass

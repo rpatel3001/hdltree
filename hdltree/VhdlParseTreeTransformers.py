@@ -1,7 +1,6 @@
 from lark import v_args, Transformer, Visitor, Tree, Token, Discard
 
 class Tokens(Transformer):
-    pass
     as_list = list
     # turn terminal tokens into base data types
     # def __default_token__(self, token):
