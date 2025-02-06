@@ -17,9 +17,9 @@ from . import VhdlCstTransformer
 
 # https://github.com/pypy/pypy/issues/2999#issuecomment-1906226685
 def fix_pypy_console():
-    stdout.reconfigure(encoding="latin-1")
-    stderr.reconfigure(encoding="latin-1")
-    return
+    #stdout.reconfigure(encoding="latin-1")
+    #stderr.reconfigure(encoding="latin-1")
+    #return
     import platform
     import sys
     import subprocess
@@ -248,7 +248,17 @@ def main():
         default=[],
         help="Files and directories to ignore",
     )
+    parser.add_argument(
+        "-f",
+        "--fix-console",
+        action="store_true",
+        help="Fix console encoding (needed for pypy)",
+    )
     args, unparsed = parser.parse_known_args()
+
+    if args.fix_console:
+        fix_pypy_console()
+
     # Allow file to be passed in without -i
     if not args.input:
         if len(unparsed) > 0:
