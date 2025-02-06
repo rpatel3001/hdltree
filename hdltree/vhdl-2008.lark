@@ -671,7 +671,7 @@ HEX_LETTER: /[a-f]/i
 EXTENDED_DIGIT: DIGIT
     | HEX_LETTER
 
-extended_identifier: _BACKSLASH GRAPHIC_STRING _BACKSLASH
+extended_identifier: _BACKSLASH GRAPHIC_STRING_NO_BACKSLASH _BACKSLASH
 
 ?external_name: external_constant_name
     | external_signal_name
@@ -755,6 +755,13 @@ GRAPHIC_CHARACTER: UPPER_CASE_LETTER
     | LOWER_CASE_LETTER
     | OTHER_SPECIAL_CHARACTER
 
+GRAPHIC_CHARACTER_NO_BACKSLASH: UPPER_CASE_LETTER
+    | DIGIT
+    | SPECIAL_CHARACTER
+    | SPACE_CHARACTER
+    | LOWER_CASE_LETTER
+    | OTHER_SPECIAL_CHARACTER_NO_BACKSLASH
+
 ESCAPED_GRAPHIC_CHARACTER: UPPER_CASE_LETTER
     | DIGIT
     | SPACE_CHARACTER
@@ -764,6 +771,7 @@ ESCAPED_GRAPHIC_CHARACTER: UPPER_CASE_LETTER
 
 // add this helper so various higher level productions can be rules instead of terminals
 GRAPHIC_STRING: GRAPHIC_CHARACTER+
+GRAPHIC_STRING_NO_BACKSLASH: GRAPHIC_CHARACTER_NO_BACKSLASH+
 ESCAPED_GRAPHIC_STRING: ESCAPED_GRAPHIC_CHARACTER+
 
 group_constituent: name
@@ -1409,6 +1417,7 @@ SPACE_CHARACTER: /[ \t\u00A0]/
 LOWER_CASE_LETTER: /[a-z‗אבגדהוזחטיךכלםמןנסעףפץצרשתûü‎‏ÿ]/
 
 OTHER_SPECIAL_CHARACTER: /[^ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ"#&'()*+,\-.\/:;<=>?@[\]_`|‗אבגדהוזחטיךכלםמןנסעףפץצרשתûü‎‏ÿ\w\s]/
+OTHER_SPECIAL_CHARACTER_NO_BACKSLASH: /[^ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ"#&'()*+,\-.\/:;<=>?@[\]_`|‗אבגדהוזחטיךכלםמןנסעףפץצרשתûü‎‏ÿ\w\s\\]/
 //OTHER_SPECIAL_CHARACTER: /[!$%\\^{}~¡¢£¤¥¦§¨©×«¬®¯°±²³´?¶·¸¹÷»¼½¾¿×ק-]/
 
 // ignore PSL (further defined in IEEE-1850-2005)
