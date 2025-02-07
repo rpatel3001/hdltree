@@ -58,7 +58,7 @@ if __name__ == "__main__":
         elif inpath.is_dir() and not is_excluded(inpath, args.exclude):
             for ext in vhdl_fileext:
                 for infile in inpath.rglob("**/*." + ext):
-                    if not is_excluded(infile, args.exclude):
+                    if infile.is_file() and not is_excluded(infile, args.exclude):
                         files.append(infile)
 
     for f in files:

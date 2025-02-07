@@ -278,7 +278,7 @@ def main():
         elif inpath.is_dir() and not is_excluded(inpath, args.exclude):
             for ext in vhdl_fileext:
                 for infile in inpath.rglob("**/*." + ext):
-                    if not is_excluded(infile, args.exclude):
+                    if infile.is_file() and not is_excluded(infile, args.exclude):
                         files.append(infile)
 
     for f in files:
@@ -304,7 +304,7 @@ def main():
         lines = f.read_text("latin-1").count("\n")
         elapsed = time() - prev
         print(
-            f"\ranalyzed {f} ({lines} lines) in {elapsed:.2f} seconds ({lines/elapsed:.2f} lines/sec)"
+            f"\ranalyzed {f} ({lines} lines) in {elapsed:.2f} seconds ({lines/elapsed if elapsed else float('inf'):.2f} lines/sec)"
         )
 
         if args.print_tree:
