@@ -292,20 +292,20 @@ abstract_literal: decimal_literal | based_literal
 
 access_type_definition: _ACCESS subtype_indication
 
-actual_designator: [ INERTIAL ] expression
-    | signal_name
-    | variable_name
-    | file_name
-    | subtype_indication
-    | subprogram_name
-    | instantiated_package_name
-    | OPEN
+actual_designator: [ INERTIAL ] expression -> inertial_actual_designator
+    | signal_name -> bare_actual_designator
+    | variable_name -> bare_actual_designator
+    | file_name -> bare_actual_designator
+    | subtype_indication -> bare_actual_designator
+    | subprogram_name -> bare_actual_designator
+    | instantiated_package_name -> bare_actual_designator
+    | OPEN -> bare_actual_designator
 
 ?actual_parameter_part: parameter_association_list
 
-actual_part: actual_designator
-    | function_name _LPAREN actual_designator _RPAREN
-    | type_mark _LPAREN actual_designator _RPAREN
+actual_part: actual_designator -> actual_part_name_only
+    | function_name _LPAREN actual_designator _RPAREN -> actual_part_with_conversion
+    | type_mark _LPAREN actual_designator _RPAREN -> actual_part_with_conversion
 
 ADDING_OPERATOR: PLUS
     | MINUS
@@ -544,8 +544,8 @@ context_reference: _CONTEXT selected_name ( _COMMA selected_name )* _SEMICOLON -
 
 decimal_literal: INTEGER [ _DOT INTEGER ] [ exponent ]
 
-delay_mechanism: TRANSPORT
-    | [ _REJECT time_expression ] INERTIAL
+delay_mechanism: TRANSPORT -> transport_delay_mechanism
+    | [ _REJECT time_expression ] INERTIAL -> inertial_delay_mechanism
 
 // add branch for encrypted files (and MULTILINE_STRING)
 design_file: design_unit+ -> design_file
@@ -663,8 +663,8 @@ exit_statement: [ label _COLON ] _EXIT [ loop_label ] [ _WHEN condition ] _SEMIC
 exponent: _E [ PLUS ] INTEGER
     | _E MINUS INTEGER
 
-expression: CONDITION_OPERATOR primary
-    | logical_expression
+expression: CONDITION_OPERATOR primary -> conditional_operator_expression
+    | logical_expression -> bare_expression
 
 // second branch was LETTER, but we only need A-F (LRM 15.5.3)
 HEX_LETTER: /[a-f]/i
@@ -687,10 +687,10 @@ external_variable_name: _DLANGLE _VARIABLE external_pathname _COLON subtype_indi
     | absolute_pathname
     | relative_pathname
 
-factor: primary [ _EXP primary ]
-    | ABS primary
-    | NOT primary
-    | LOGICAL_OPERATOR primary
+factor: primary [ _EXP primary ] -> factor_exp
+    | ABS primary -> factor_op
+    | NOT primary -> factor_op
+    | LOGICAL_OPERATOR primary -> factor_op
 
 file_declaration: _FILE identifier_list _COLON subtype_indication [ file_open_information ] _SEMICOLON
 

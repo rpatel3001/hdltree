@@ -14,9 +14,10 @@ if getenv("DEBUG"):
     from pydantic import ConfigDict
     from pydantic.dataclasses import dataclass
 
-    dataclass = dataclass(config=ConfigDict(arbitrary_types_allowed=True))
+    dataclass = dataclass(slots=True, config=ConfigDict(arbitrary_types_allowed=True))
 else:
     from dataclasses import dataclass
+    dataclass = dataclass(slots=True)
 
 nl = "\n"
 
@@ -382,27 +383,24 @@ class Primary(_VhdlCstNode):
 
 
 @dataclass
-class Factor(_VhdlCstListNode):
-    _list: InitVar[tuple[Token, Primary] | tuple[Primary, Primary | None]]
-    factor_op: Optional[Token | None] = None
-    primary: Optional[Primary] = None
-    exponent: Optional[Token | None] = None
-
-    def __post_init__(self, _list):
-        if isinstance(_list[0], Token):
-            super().__setattr__("factor_op", _list[0])
-            super().__setattr__("primary", _list[1])
-            super().__setattr__("exponent", None)
-        else:
-            super().__setattr__("factor_op", None)
-            super().__setattr__("primary", _list[0])
-            super().__setattr__("exponent", _list[1])
+class FactorExp(_VhdlCstNode):
+    primary: Primary
+    exponent: Primary | None
 
     def format(self):
-        if self.factor_op:
-            return f"{self.factor_op} {self.primary}"
-        else:
-            return f"{self.primary}{nonestr(self.exponent, pre='**')}"
+        return f"{self.primary}{nonestr(self.exponent, pre='**')}"
+
+
+@dataclass
+class FactorOp(_VhdlCstNode):
+    factor_op: Token
+    primary: Primary
+
+    def format(self):
+        return f"{self.factor_op} {self.primary}"
+
+
+Factor: TypeAlias = FactorExp | FactorOp
 
 
 @dataclass
@@ -471,22 +469,23 @@ class LogicalExpression(_VhdlCstListNode):
 
 
 @dataclass
-class Expression(_VhdlCstListNode):
-    _list: InitVar[tuple[Token, Primary] | tuple[LogicalExpression]]
-    conditional: Optional[Token | None] = None
-    expression: Optional[LogicalExpression] = None
-
-    def __post_init__(self, _list):
-        terms = len(_list)
-        if 2 == terms:
-            super().__setattr__("conditional", _list[0])
-            super().__setattr__("expression", _list[1])
-        elif 1 == terms:
-            super().__setattr__("conditional", None)
-            super().__setattr__("expression", _list[0])
+class ConditionalOperatorExpression(_VhdlCstNode):
+    conditional: Token
+    expression: Primary
 
     def format(self):
-        return nonestr(self.conditional, post=" ") + str(self.expression)
+        return f"?? {self.expression}"
+
+
+@dataclass
+class BareExpression(_VhdlCstNode):
+    expression: LogicalExpression
+
+    def format(self):
+        return self.expression.format()
+
+
+Expression: TypeAlias = ConditionalOperatorExpression | BareExpression
 
 
 @dataclass
@@ -1200,48 +1199,43 @@ FormalPart: TypeAlias = FormalPartNameOnly | FormalPartWithConversion
 
 
 @dataclass
-class ActualDesignator(_VhdlCstListNode):
-    _list: InitVar[tuple[Token | None, Expression] | tuple[Name | SubtypeIndication | Token]]
-    INERTIAL: Optional[Token | None] = None
-    actual: Optional[Expression | Name | SubtypeIndication | Token] = None
-
-    def __post_init__(self, _list):
-        if 2 == len(_list):
-            super().__setattr__("INERTIAL", _list[0])
-            super().__setattr__("actual", _list[1])
-        elif isinstance(_list[0], Identifier):
-            super().__setattr__("actual", _list[0])
-        else:
-            super().__setattr__("actual", _list[0])
+class InertialActualDesignator(_VhdlCstNode):
+    INERTIAL: Token | None
+    actual: Expression
 
     def format(self):
-        return nonestr(self.INERTIAL, post=" ") + str(self.actual)
+        return nonestr(self.INERTIAL, post=" ") + self.actual.format()
 
 
 @dataclass
-class ActualPart(_VhdlCstListNode):
-    _list: InitVar[tuple[ActualDesignator] | tuple[Identifier | TypeMark, ActualDesignator]]
-    actual: Optional[ActualDesignator] = None
-    function_name: Optional[Identifier] = None
-    type: Optional[TypeMark] = None
-
-    def __post_init__(self, _list):
-        if isinstance(_list[0], ActualDesignator):
-            super().__setattr__("actual", _list[0])
-        elif isinstance(_list[0], Identifier):
-            super().__setattr__("function_name", _list[0])
-            super().__setattr__("actual", _list[1])
-        else:
-            super().__setattr__("type", _list[0])
-            super().__setattr__("actual", _list[1])
+class BareActualDesignator(_VhdlCstNode):
+    actual: Name | SubtypeIndication | Token
 
     def format(self):
-        if self.function_name:
-            return f"{self.function_name}({self.actual})"
-        elif self.type:
-            return f"{self.type}({self.actual})"
-        else:
-            return f"{self.actual}"
+        return str(self.actual)
+
+
+ActualDesignator: TypeAlias = InertialActualDesignator | BareActualDesignator
+
+
+@dataclass
+class ActualPartNameOnly(_VhdlCstNode):
+    actual: ActualDesignator
+
+    def format(self):
+        return f"{self.actual}"
+
+
+@dataclass
+class ActualPartWithConversion(_VhdlCstNode):
+    converter: Name | TypeMark
+    actual: ActualDesignator
+
+    def format(self):
+        return f"{self.converter}({self.actual})"
+
+
+ActualPart: TypeAlias = ActualPartNameOnly | ActualPartWithConversion
 
 
 @dataclass
@@ -2029,23 +2023,23 @@ class Target(_VhdlCstNode):
 
 
 @dataclass
-class DelayMechanism(_VhdlCstListNode):
-    _list: InitVar[tuple[Token] | tuple[Expression | None, Token]]
-    type: Optional[Token] = None
-    time_expression: Optional[Expression | None] = None
-
-    def __post_init__(self, _list):
-        if isinstance(_list[0], Token):
-            super().__setattr__("type", _list[0])
-        else:
-            super().__setattr__("time_expression", _list[0])
-            super().__setattr__("type", _list[1])
+class TransportDelayMechanism(_VhdlCstNode):
+    type: Token
 
     def format(self):
-        if self.time_expression:
-            return f"reject {self.time_expression} {self.type}"
-        else:
-            return f"{self.type}"
+        return f"{self.type}"
+
+
+@dataclass
+class InertialDelayMechanism(_VhdlCstNode):
+    time_expression: Expression | None
+    type: Token
+
+    def format(self):
+        return f"reject {self.time_expression} {self.type}"
+
+
+DelayMechanism: TypeAlias = TransportDelayMechanism | InertialDelayMechanism
 
 
 @dataclass
