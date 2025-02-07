@@ -1,4 +1,6 @@
 from lark import v_args, Transformer, Visitor, Tree, Token, Discard
+from lark.tree import Meta
+from lark import ast_utils
 
 class Tokens(Transformer):
     as_list = list
@@ -10,7 +12,7 @@ class Tokens(Transformer):
 class AddCstParent(Visitor):
     def __default__(self, tree):
         for child in tree.children:
-            if isinstance(child, Tree):
+            if isinstance(child, ast_utils.Ast):
                 assert not hasattr(child, "parent")
                 child.parent = tree
             elif isinstance(child, list):
@@ -19,6 +21,8 @@ class AddCstParent(Visitor):
             elif child is None:
                 pass
             elif isinstance(child, Token):
+                pass
+            elif isinstance(child, Meta):
                 pass
             else:
                 print(type(child))

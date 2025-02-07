@@ -165,6 +165,7 @@ class VhdlParser:
             debug=debug,
             ambiguity="explicit" if ambig else "resolve",
             lexer="dynamic",
+            propagate_positions=True,
         )
         self.csttransformer = ast_utils.create_transformer(
             VhdlCstTransformer, VhdlParseTreeTransformers.Tokens()

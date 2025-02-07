@@ -44,8 +44,8 @@ def camel2snake(name):
 # Base class for CST nodes to get picked up by lark
 # This will be skipped by create_transformer(), because it starts with an underscore
 @dataclass
-class _VhdlCstNode(Tree, ast_utils.Ast):  # , ast_utils.WithMeta):
-    # meta: Meta
+class _VhdlCstNode(ast_utils.Ast, ast_utils.WithMeta):
+    meta: Meta
 
     def __str__(self):
         return self.format()
@@ -53,13 +53,32 @@ class _VhdlCstNode(Tree, ast_utils.Ast):  # , ast_utils.WithMeta):
     def add_parent(self, parent):
         super().__setattr__("parent", parent)
 
+    def iter_subtrees(self):
+        """Depth-first iteration.
+
+        Iterates over all the subtrees, never returning to the same node twice (Lark's parse-tree is actually a DAG).
+        """
+        queue = [self]
+        subtrees = dict()
+        for subtree in queue:
+            subtrees[id(subtree)] = subtree
+            queue += [c for c in reversed(subtree.children)
+                      if isinstance(c, ast_utils.Ast) and id(c) not in subtrees]
+
+        del queue
+        return reversed(list(subtrees.values()))
+
+    def find_pred(self, pred):
+        """Returns all nodes of the tree that evaluate pred(node) as true."""
+        return filter(pred, self.iter_subtrees())
+
+    def find_data(self, data):
+        """Returns all nodes of the tree whose data equals the given data."""
+        return self.find_pred(lambda t: t.data == data)
+
     @property
     def data(self):
         return type(self).__name__
-
-    @property
-    def meta(self):
-        return None
 
     @property
     def children(self):
@@ -209,10 +228,10 @@ class _VhdlCstNode(Tree, ast_utils.Ast):  # , ast_utils.WithMeta):
 
         if self_meta is None:
             annotated_type = annotate_type(type(self).__name__, self)
-            branch = RichTree(f"{camel2snake(type(self).__name__)} [ {annotated_type} ]")
+            branch = RichTree(f"{camel2snake(type(self).__name__)} [ {annotated_type} ]" + (f" line {self.meta.line} char {self.meta.column}" if not self.meta.empty else ""))
         else:
             annotated_type = annotate_type(self_meta.type, self)
-            branch = RichTree(self_meta.name + f" [ {annotated_type} ]")
+            branch = RichTree(self_meta.name + f" [ {annotated_type} ]" + (f" line {self.meta.line} char {self.meta.column}" if not self.meta.empty else ""))
         for field_meta in fields(self):
             field_val = getattr(self, field_meta.name)
             if isinstance(field_val, Meta):
