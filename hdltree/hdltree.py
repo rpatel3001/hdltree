@@ -5,7 +5,7 @@ from json import dumps, loads
 from lark import Lark, logger, ast_utils
 from lark_ambig_tools import CountTrees
 from lark.exceptions import UnexpectedCharacters, VisitError
-from rich import print as richprint
+from rich.console import Console
 from argparse import ArgumentParser
 from io import StringIO, TextIOBase
 from time import time
@@ -309,7 +309,8 @@ def main():
         )
 
         if args.print_tree:
-            richprint(cst.rich_tree())
+            con = Console(emoji=False)
+            con.print(cst.rich_tree())
 
 
 if __name__ == "__main__":

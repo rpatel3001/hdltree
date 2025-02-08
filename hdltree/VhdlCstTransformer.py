@@ -161,6 +161,7 @@ class _VhdlCstNode(ast_utils.Ast, ast_utils.WithMeta):
     # return a rich.tree.Tree for pretty printing
     def rich_tree(self, self_meta=None):
         from rich.tree import Tree as RichTree
+        from rich.markup import escape
 
         # expand aliases
         def deref_type(rawtype):
@@ -217,14 +218,14 @@ class _VhdlCstNode(ast_utils.Ast, ast_utils.WithMeta):
                 # token_branch = RichTree(f'{field_meta.name}{(f"[{iter}]") if iter != -1 else ""} [ {annotated_type} ]')
                 token_branch = RichTree(f"{field_meta.name} [ {annotated_type} ]")
                 token_branch.add(
-                    f"[green]{field_val}[/green]"
+                    f"[green]{escape(field_val.format()) if field_val else 'None'}[/green]"
                     + (f" line {field_val.line} char {field_val.column}" if field_val else "")
                 )
                 return [token_branch]
             elif field_val is None:
                 return [RichTree("[green]None[/green]")]
             else:
-                raise ValueError(f"unknown CST item: {field_val}\n\nin Tree {field_val.parent}")
+                raise ValueError(f"unknown CST item: {escape(str(field_val))}\n\nin Tree {field_val.parent}")
 
         if self_meta is None:
             annotated_type = annotate_type(type(self).__name__, self)
