@@ -53,6 +53,8 @@ class _VhdlCstNode(ast_utils.Ast, ast_utils.WithMeta):
     def add_parent(self, parent):
         super().__setattr__("parent", parent)
 
+    # a few Tree functions borrowed from Lark so _VhdlCstNode is sort of but not exactly like a lark Tree
+    # (subclassing messes with dataclass fields when using WithMeta)
     def iter_subtrees(self):
         """Depth-first iteration.
 

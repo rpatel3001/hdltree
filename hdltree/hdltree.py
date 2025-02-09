@@ -294,7 +294,6 @@ def main():
             print(e.allowed)
             print("from rules:")
             print(e.considered_rules)
-            print()
         except VisitError as e:
             print(e)
             errjson = e.__context__.json()
@@ -302,6 +301,7 @@ def main():
         except Exception as e:
             print(e)
 
+        print()
         lines = f.read_text("latin-1").count("\n")
         elapsed = time() - prev
         print(
