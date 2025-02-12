@@ -3,10 +3,10 @@ from __future__ import annotations  # for forward annotations
 from sys import modules
 from os import getenv
 from types import SimpleNamespace
-from typing import List, Optional, TypeAlias
-from lark import ast_utils, Token, Tree
+from typing import List, TypeAlias
+from lark import ast_utils, Token
 from lark.tree import Meta
-from dataclasses import InitVar, fields
+from dataclasses import fields
 from re import sub
 
 if getenv("DEBUG"):

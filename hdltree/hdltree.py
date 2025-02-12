@@ -1,4 +1,3 @@
-from sys import stdout, stderr
 import logging
 from pathlib import Path
 from json import dumps, loads
@@ -7,7 +6,7 @@ from lark_ambig_tools import CountTrees
 from lark.exceptions import UnexpectedCharacters, VisitError
 from rich.console import Console
 from argparse import ArgumentParser
-from io import StringIO, TextIOBase
+from io import TextIOBase
 from time import time
 from typing import List
 
