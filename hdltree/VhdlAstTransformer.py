@@ -288,10 +288,10 @@ class Library(Tree):
                 self.modules.append(mod)
                 new_mods.append(mod)
             elif isinstance(lu, VhdlCst.ArchitectureBody):
-                name = str(lu.identifier)
+                name = str(lu.entity_name)
                 if mod := self.get_module(name):
-                    if mod.identifier:
-                        raise ValueError(f"entity {name} already has an architecture ({mod.identifier})")
+                    if mod.arch_name:
+                        raise ValueError(f"entity {name} already has an architecture ({mod.arch_name})")
                     mod.add_context(ctx)
                     mod.add_arch(lu)
                 else:

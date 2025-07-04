@@ -99,6 +99,8 @@ if __name__ == "__main__":
 
         if txt != csttxt:
             print(f"{Fore.RED}inexact recreation: {f.name}{Fore.RESET}")
+            print(txt)
+            print(csttxt)
         else:
             print(f"{Fore.GREEN}more or less exact recreation: {f.name}{Fore.RESET}")
 

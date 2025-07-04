@@ -368,7 +368,7 @@ def main():
                         else:
                             raise ValueError(f"bad package subprogram type {type(s).__name__}")
             for mod in lib.modules:
-                print(f"\tmodule {mod.name} -> {[f.path.as_posix() for f in mod.files]}")
+                print(f"\tmodule {mod.name}({mod.arch_name}) -> {[f.path.as_posix() for f in mod.files]}")
                 if params := mod.parameters:
                     print(f"\t\tgeneric")
                     for p in params:
@@ -377,9 +377,9 @@ def main():
                         elif isinstance(p, VhdlAst.InterfaceType):
                             print(f"\t\t\ttype {p.name}")
                         elif isinstance(p, VhdlAst.InterfaceSubprogram):
-                            print(f"\t\t\tsubprogram {p.name} {(':= ' + p.default) if p.default is not None else ''}")
+                            print(f"\t\t\t{p.name} : subprogram {(':= ' + p.default) if p.default is not None else ''}")
                         elif isinstance(p, VhdlAst.InterfacePackage):
-                            print(f"\t\t\tpackage {p.name} is {p.base_name}")
+                            print(f"\t\t\t{p.name} : package := {p.base_name}")
                         else:
                             raise ValueError(f"bad module generic type {type(p).__name__}")
                 if ports := mod.ports:
