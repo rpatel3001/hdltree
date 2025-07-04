@@ -11,7 +11,8 @@ from time import time
 from typing import List
 
 from . import VhdlParseTreeTransformers
-from . import VhdlCstTransformer
+from . import VhdlCstTransformer as VhdlCst
+from . import VhdlAstTransformer as VhdlAst
 
 
 # https://github.com/pypy/pypy/issues/2999#issuecomment-1906226685
@@ -86,10 +87,12 @@ class HdlParser:
 
         if isinstance(fpath, Path):
             txt = fpath.read_text("latin-1")
-            return self.parse(txt, ftype)
+            p = self.parse(txt, ftype)
         elif isinstance(fpath, TextIOBase):
             txt = fpath.read()
-            return self.parse(txt, ftype)
+            p = self.parse(txt, ftype)
+        p.path = fpath
+        return p
 
     def parse(self, txt: str, ftype: str = "VHDL"):
         if ftype == "VHDL":
@@ -129,10 +132,12 @@ class VerilogParser:
 
         if isinstance(fpath, Path):
             txt = fpath.read_text("latin-1")
-            return self.parse(txt)
+            p = self.parse(txt)
         elif isinstance(fpath, TextIOBase):
             txt = fpath.read()
-            return self.parse(txt)
+            p = self.parse(txt)
+        p.path = fpath
+        return p
 
     def parse(self, txt: str):
         raise NotImplementedError("Verilog parsing not yet supported!")
@@ -167,7 +172,7 @@ class VhdlParser:
             propagate_positions=True,
         )
         self.csttransformer = ast_utils.create_transformer(
-            VhdlCstTransformer, VhdlParseTreeTransformers.Tokens()
+            VhdlCst, VhdlParseTreeTransformers.Tokens()
         )
 
     def parseFile(self, fpath: TextIOBase | Path | str):
@@ -176,10 +181,12 @@ class VhdlParser:
 
         if isinstance(fpath, Path):
             txt = fpath.read_text("latin-1")
-            return self.parse(txt)
+            p = self.parse(txt)
         elif isinstance(fpath, TextIOBase):
             txt = fpath.read()
-            return self.parse(txt)
+            p = self.parse(txt)
+        p.path = fpath
+        return p
 
     def parse(self, txt: str):
         # parse code to tree
@@ -233,9 +240,6 @@ def main():
     parser = ArgumentParser(description="Pure Python HDL parser")
     parser.add_argument("-i", "--input", action="append", help="HDL source file or directory")
     parser.add_argument(
-        "-p", "--print-tree", action="store_true", help="Print the parsed tree to stdout"
-    )
-    parser.add_argument(
         "-a",
         "--ambig",
         action="store_true",
@@ -253,6 +257,21 @@ def main():
         "--fix-console",
         action="store_true",
         help="Fix console encoding (needed for pypy)",
+    )
+    parser.add_argument(
+        "--cst",
+        action="store_true",
+        help="Print CST to console",
+    )
+    parser.add_argument(
+        "--ast",
+        action="store_true",
+        help="Print AST to console",
+    )
+    parser.add_argument(
+        "--simple",
+        action="store_true",
+        help="Print simplified AST to console",
     )
     args, unparsed = parser.parse_known_args()
 
@@ -277,15 +296,17 @@ def main():
             files.append(inpath)
         elif inpath.is_dir() and not is_excluded(inpath, args.exclude):
             for ext in vhdl_fileext:
-                for infile in inpath.rglob("**/*." + ext):
+                for infile in inpath.rglob("*." + ext):
                     if infile.is_file() and not is_excluded(infile, args.exclude):
                         files.append(infile)
 
+    proj = VhdlAst.Project()
+    csts = []
     for f in files:
         print(f"analyzing {f}", end="", flush=True)
         prev = time()
         try:
-            cst = ve.parseFile(f)
+            csts.append(ve.parseFile(f))
         except UnexpectedCharacters as e:
             print()
             print(f"error at line {e.line}, column {e.column}")
@@ -300,17 +321,72 @@ def main():
         except Exception as e:
             print(e)
 
-        print()
         lines = f.read_text("latin-1").count("\n")
         elapsed = time() - prev
         print(
             f"\ranalyzed {f} ({lines} lines) in {elapsed:.2f} seconds ({lines/elapsed if elapsed else float('inf'):.2f} lines/sec)"
         )
 
-        if args.print_tree:
+    lib = proj.get_library("src")
+    for cst in csts:
+        try:
+            lib.add_cst(cst)
+        except ValueError as e:
+            print(e)
+
+        if args.cst:
             con = Console(emoji=False)
             con.print(cst.rich_tree())
 
+    if args.ast:
+        con = Console(emoji=False)
+        con.print(proj.rich_tree())
+
+    if args.simple:
+        for lib in proj.libraries:
+            print(f"library {lib.name}")
+            for pkg in lib.packages:
+                print(f"\tpackage {pkg.name} -> {[f.path.as_posix() for f in pkg.files]}")
+                if params := pkg.parameters:
+                    print(f"\t\tgeneric")
+                    for p in params:
+                        if isinstance(p, VhdlAst.InterfaceNet):
+                            print(f"\t\t\t{p.name} : {p.type} {(':= ' + p.default) if p.default is not None else ''}")
+                        elif isinstance(p, VhdlAst.InterfaceType):
+                            print(f"\t\t\ttype {p.name}")
+                        elif isinstance(p, VhdlAst.InterfaceSubprogram):
+                            print(f"\t\t\tsubprogram {p.name} {(':= ' + p.default) if p.default is not None else ''}")
+                        elif isinstance(p, VhdlAst.InterfacePackage):
+                            print(f"\t\t\tpackage {p.name} is {p.base_name}")
+                        else:
+                            raise ValueError(f"bad package generic type {type(p).__name__}")
+                if subprograms := pkg.subprograms:
+                    print(f"\t\tsubprogram")
+                    for s in subprograms:
+                        if isinstance(s, VhdlAst.Subprogram):
+                            print(f"\t\t\t{s.name}")
+                        else:
+                            raise ValueError(f"bad package subprogram type {type(s).__name__}")
+            for mod in lib.modules:
+                print(f"\tmodule {mod.name} -> {[f.path.as_posix() for f in mod.files]}")
+                if params := mod.parameters:
+                    print(f"\t\tgeneric")
+                    for p in params:
+                        if isinstance(p, VhdlAst.InterfaceNet):
+                            print(f"\t\t\t{p.name} : {p.type} {(':= ' + p.default) if p.default is not None else ''}")
+                        elif isinstance(p, VhdlAst.InterfaceType):
+                            print(f"\t\t\ttype {p.name}")
+                        elif isinstance(p, VhdlAst.InterfaceSubprogram):
+                            print(f"\t\t\tsubprogram {p.name} {(':= ' + p.default) if p.default is not None else ''}")
+                        elif isinstance(p, VhdlAst.InterfacePackage):
+                            print(f"\t\t\tpackage {p.name} is {p.base_name}")
+                        else:
+                            raise ValueError(f"bad module generic type {type(p).__name__}")
+                if ports := mod.ports:
+                    print(f"\t\tport")
+                    for p in ports:
+                        print(f"\t\t\t{p.name} : {p.dir} {p.type} {(':= ' + p.default) if p.default is not None else ''}")
+            print()
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,8 @@ from __future__ import annotations  # for forward annotations
 from sys import modules
 from os import getenv
 from types import SimpleNamespace
-from typing import List, TypeAlias
+from typing import List, TypeAlias, Optional
+from pathlib import Path
 from lark import ast_utils, Token
 from lark.tree import Meta
 from dataclasses import fields
@@ -224,10 +225,12 @@ class _VhdlCstNode(ast_utils.Ast, ast_utils.WithMeta):
                     + (f" line {field_val.line} char {field_val.column}" if field_val else "")
                 )
                 return [token_branch]
-            elif field_val is None:
-                return [RichTree("[green]None[/green]")]
+            elif isinstance(field_val, Path):
+                token_branch = RichTree(f"path [ Path ]")
+                token_branch.add(f"{field_val.as_posix()}")
+                return [token_branch]
             else:
-                raise ValueError(f"unknown CST item: {escape(str(field_val))}\n\nin Tree {field_val.parent}")
+                raise ValueError(f"unknown CST item: {escape(str(field_val))}\nof type {type(field_val)}\nin Tree {field_val.parent}")
 
         if self_meta is None:
             annotated_type = annotate_type(type(self).__name__, self)
@@ -1781,7 +1784,7 @@ class EntityAspectWithArch(_VhdlCstNode):
     architecture: Identifier | None
 
     def format(self):
-        return f"entity {self.entity_name}{nonestr(self.architecture, pre='(', post=')')}"
+        return f"entity {self.identifier}{nonestr(self.architecture, pre='(', post=')')}"
 
 
 @dataclass
@@ -2813,6 +2816,7 @@ class DesignUnit(_VhdlCstNode):
 @dataclass
 class DesignFile(_VhdlCstListNode):
     design_units: List[DesignUnit]
+    path: Optional[Path] = None
 
     def format(self):
         return nonestr(self.design_units, sep=f"\n")
@@ -2830,6 +2834,7 @@ class ToolDirective(_VhdlCstNode):
 @dataclass
 class EncryptedDesignFile(_VhdlCstListNode):
     directives: List[ToolDirective | Token]
+    path: Optional[Path] = None
 
     def format(self):
         return nonestr(self.directives, sep=f"\n")

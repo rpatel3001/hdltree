@@ -1,7 +1,7 @@
 from itertools import zip_longest
 import pydot
 
-from .VhdlCstTransformer import EntityDeclaration, InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration
+from .VhdlCstTransformer import EntityDeclaration, InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration, InterfacePackageDeclaration
 
 def to_symbol(ent: EntityDeclaration, with_generics=True, with_ports=True):
     if len(ent.generics) + len(ent.ports) == 0:
@@ -12,7 +12,7 @@ def to_symbol(ent: EntityDeclaration, with_generics=True, with_ports=True):
     if with_generics:
         generics = ent.generics
         for g in generics:
-            if not isinstance(g.generic_declaration, (InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration)):
+            if not isinstance(g.generic_declaration, (InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration, InterfacePackageDeclaration)):
                 for name in g.generic_declaration.identifier_list:
                     dotstr += f"""
                         <tr>
@@ -71,7 +71,7 @@ def to_symbol(ent: EntityDeclaration, with_generics=True, with_ports=True):
 
         if with_generics:
             for g in generics:
-                if not isinstance(g.generic_declaration, (InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration)):
+                if not isinstance(g.generic_declaration, (InterfaceIncompleteTypeDeclaration, InterfaceSubprogramDeclaration, InterfacePackageDeclaration)):
                     stype = g.generic_declaration.subtype_indication
                     for name in g.generic_declaration.identifier_list:
                         dotstr += f"""
