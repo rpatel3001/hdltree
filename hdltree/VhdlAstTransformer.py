@@ -1,7 +1,7 @@
 from __future__ import annotations  # for forward annotations
 
-from typing import List, TypeAlias
-from dataclasses import dataclass, field, fields
+from typing import List, Set, Tuple, TypeAlias
+from dataclasses import field, fields
 from os import getenv
 from pathlib import Path
 from lark import Tree as LarkTree
@@ -29,7 +29,7 @@ def nonestr(val):
     return str(val) if val is not None else None
 
 @dataclass
-class Tree(LarkTree):
+class Tree():
     # print a simple version of the CST, probably prefer rich_tree
     def print(self, level=0):
         INDENT_TOKEN = "  "
@@ -170,9 +170,9 @@ class Subprogram(Tree):
     name: str
 
 @dataclass
-class Package(Tree):
+class DeclaredPackage(Tree):
     name: str
-    files: List[File] = field(default_factory=list)
+    files: Set[File] = field(default_factory=set)
     has_body: bool = False
     context: Context = None
     parameters: List[InterfaceElement] = field(default_factory=list)
@@ -211,9 +211,18 @@ class Package(Tree):
         self.has_body = True
 
 @dataclass
+class InstancedPackage(Tree):
+    name: str
+    files: Set[File] = field(default_factory=set)
+    declaration: DeclaredPackage = None
+    mapping: List[Tuple] = field(default_factory=list)
+
+Package: TypeAlias = DeclaredPackage | InstancedPackage
+
+@dataclass
 class Module(Tree):
     name: str
-    files: List[File] = field(default_factory=list)
+    files: Set[File] = field(default_factory=set)
     arch_name: str = ""
     context: Context = None
     parameters: List[InterfaceElement] = field(default_factory=list)
@@ -255,6 +264,9 @@ class Module(Tree):
 class File(Tree):
     path: Path
 
+    def __hash__(self):
+        return self.path.__hash__()
+
 @dataclass
 class Library(Tree):
     name: str
@@ -282,7 +294,7 @@ class Library(Tree):
                 if mod := self.get_module(name):
                     raise ValueError(f"entity {name} already exists")
                 print(f"creating entity {name}")
-                mod = Module(name, [File(cst.path)])
+                mod = Module(name, {File(cst.path)})
                 mod.add_context(ctx)
                 mod.add_entity(lu)
                 self.modules.append(mod)
@@ -301,7 +313,7 @@ class Library(Tree):
                 if pkg := self.get_package(name):
                     raise ValueError(f"package {name} already exists")
                 print(f"creating package {name}")
-                pkg = Package(name, [File(cst.path)])
+                pkg = DeclaredPackage(name, {File(cst.path)})
                 pkg.add_context(ctx)
                 pkg.add_package(lu)
                 self.packages.append(pkg)
@@ -313,8 +325,26 @@ class Library(Tree):
                         raise ValueError(f"package {name} already has a body")
                     pkg.add_context(ctx)
                     pkg.add_body(lu)
+                    pkg.files.add(File(cst.path))
                 else:
                     raise ValueError(f"package {name} doesn't exist")
+            elif isinstance(lu, VhdlCst.PackageInstantiationDeclaration):
+                inst = str(lu.identifier)
+                pkgname = str(lu.uninstantiated_package_name)
+                baselib, basepkg = pkgname.split(".")
+                if pkg := self.get_package(basepkg):
+                    print(f"instantiating package {pkgname} as {inst}")
+                    mapping = []
+                    if genmap := lu.generic_map_aspect:
+                        for idx,m in enumerate(genmap.association_list):
+                            formal = str(m.formal) if m.formal else idx
+                            actual = str(m.actual)
+                            mapping.append((formal, actual))
+                    newpkg = InstancedPackage(inst, {File(cst.path)}, pkg, mapping)
+                    self.packages.append(newpkg)
+                    new_mods.append(newpkg)
+                else:
+                    raise ValueError(f"package {pkgname} does not exist")
             else:
                 print(f"unsupported {type(lu).__name__}")
         return new_mods

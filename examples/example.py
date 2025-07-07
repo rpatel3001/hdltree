@@ -15,7 +15,8 @@ from colorama import Fore
 
 from lark.exceptions import UnexpectedCharacters
 
-from hdltree.hdltree import HdlParser, is_excluded, vhdl_fileext
+from hdltree.hdltree import is_excluded
+from hdltree.Parsers import HdlParser, vhdl_fileext
 from hdltree.symbol import to_symbol
 
 
