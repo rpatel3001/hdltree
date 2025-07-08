@@ -50,9 +50,11 @@ class CountAmbig(Visitor):
     cnt = 0
 
     def _ambig(self, tree):
+        from rich.console import Console
         self.cnt += 1
         if self.cnt < 5:
-            print(tree.pretty())
+            con = Console(emoji=False)
+            con.print(tree)
 
 
 class CollapseAmbig(Transformer):
@@ -92,19 +94,18 @@ class MakeAmbigUnique(Transformer):
             #    print(f"trimmed {numorig} branches to {numunique}")
             return Tree("_ambig", unique)
 
-    @v_args(tree=True)
-    def function_call(self, tree):
-        functions = []
-        children = tree.children
-        while isinstance(children[0], Tree):
-            children = children[0].children
-
-        name = children[0].value
-        if name not in functions:
-            tree.to_delete = True
-            return tree
-        else:
-            return tree
+    #@v_args(tree=True)
+    #def function_call(self, tree):
+    #    functions = []
+    #    children = tree.children
+    #    while isinstance(children[0], Tree):
+    #        children = children[0].children
+    #    name = children[0].value
+    #    if name not in functions:
+    #        tree.to_delete = True
+    #        return tree
+    #    else:
+    #        return tree
 
 
     @v_args(tree=True)

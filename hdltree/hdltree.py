@@ -1,15 +1,13 @@
 from pathlib import Path
 from json import dumps, loads
-from lark_ambig_tools import CountTrees
 from lark.exceptions import UnexpectedCharacters, VisitError
 from rich.console import Console
 from argparse import ArgumentParser
 from time import time
 from typing import List
 
-from . import Parsers
-from . import VhdlParseTreeTransformers
-from . import VhdlAstTransformer as VhdlAst
+from . import Parser
+from . import Analyzer as VhdlAst
 
 
 # https://github.com/pypy/pypy/issues/2999#issuecomment-1906226685
@@ -49,14 +47,6 @@ def fix_pypy_console():
                     for f in [sys.stdin, sys.stdout, sys.stderr]:
                         if f.encoding != cur_encoding:
                             f.reconfigure(encoding=cur_encoding)
-
-
-def count(tree):
-    cnt = VhdlParseTreeTransformers.CountAmbig()
-    cnt.visit(tree)
-    print(f"ambig nodes: {cnt.cnt}")
-    counted_tree = CountTrees().transform(tree)
-    print(f"derivations: {counted_tree.derivation_count}")
 
 
 def is_excluded(inpath: Path, excluded: List[Path]):
@@ -115,7 +105,7 @@ def main():
         else:
             args.input = ["."]
 
-    ve = Parsers.HdlParser(ambig=args.ambig)
+    ve = Parser.HdlParser(ambig=args.ambig)
 
     args.input = [Path(f) for f in args.input]
     args.exclude = [Path(f) for f in args.exclude]
@@ -125,7 +115,7 @@ def main():
         if inpath.is_file() and not is_excluded(inpath, args.exclude):
             files.append(inpath)
         elif inpath.is_dir() and not is_excluded(inpath, args.exclude):
-            for ext in Parsers.vhdl_fileext:
+            for ext in Parser.vhdl_fileext:
                 for infile in inpath.rglob("*." + ext):
                     if infile.is_file() and not is_excluded(infile, args.exclude):
                         files.append(infile)
@@ -136,7 +126,7 @@ def main():
         print(f"analyzing {f}", end="", flush=True)
         prev = time()
         try:
-            csts.append(ve.parseFile(f))
+            csts.append(ve.parse_file(f))
         except UnexpectedCharacters as e:
             print()
             print(f"error at line {e.line}, column {e.column}")

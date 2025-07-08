@@ -16,7 +16,7 @@ from colorama import Fore
 from lark.exceptions import UnexpectedCharacters
 
 from hdltree.hdltree import is_excluded
-from hdltree.Parsers import HdlParser, vhdl_fileext
+from hdltree.Parser import HdlParser, vhdl_fileext
 from hdltree.symbol import to_symbol
 
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     for f in files:
         print(f"analyzing {f}")
         try:
-            cst = ve.parseFile(f)
+            cst = ve.parse_file(f)
         except UnexpectedCharacters as e:
             print()
             print(f"error at line {e.line}, column {e.column}")

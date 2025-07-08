@@ -95,6 +95,8 @@ class Tree():
 
         # recursively convert a CST node into a rich.tree.Tree
         def field2tree(field_meta, field_val):
+            if isinstance(field_val, (set, tuple)):
+                field_val = list(field_val)
             if isinstance(field_val, Tree):
                 return [field_val.rich_tree(field_meta)]
             elif isinstance(field_val, list):
@@ -114,7 +116,7 @@ class Tree():
                 # token_branch = RichTree(f'{field_meta.name}{(f"[{iter}]") if iter != -1 else ""} [ {annotated_type} ]')
                 token_branch = RichTree(f"{field_meta.name} [ {annotated_type} ]")
                 token_branch.add(
-                    f"[green]{escape(f"{field_val}") if field_val else 'None'}[/green]"
+                    f"[green]{escape(f'{field_val}') if field_val else 'None'}[/green]"
                 )
                 return [token_branch]
             elif field_val is None:
