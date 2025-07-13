@@ -1,1 +1,3 @@
-Copied from https://github.com/ghdl/ghdl/tree/master/libraries/std
+All except standard.vhdl copied from https://github.com/ghdl/ghdl/tree/master/libraries/std
+
+standard.vhdl taken from `ghdl --disp-std --std=08`

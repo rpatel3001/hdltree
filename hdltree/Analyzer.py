@@ -8,8 +8,15 @@ from lark import Tree as LarkTree
 from sys import modules
 from re import sub
 from types import SimpleNamespace
+from dataclasses import InitVar
+from io import TextIOBase
+from rich.console import Console
+from json import dumps, loads
+from lark.exceptions import UnexpectedCharacters, VisitError
+from time import time
 
 import hdltree.VhdlCstTransformer as VhdlCst
+from hdltree.Parser import HdlParser
 
 
 if getenv("DEBUG"):
@@ -19,17 +26,21 @@ if getenv("DEBUG"):
 
     dataclass = dataclass(slots=True, config=ConfigDict(arbitrary_types_allowed=True))
 else:
-    from dataclasses import dataclass
+    from dataclasses import dataclass, InitVar
+
     dataclass = dataclass(slots=True)
+
 
 def camel2snake(name):
     return sub(r"([a-z])([A-Z])", r"\1_\2", name).lower()
 
+
 def nonestr(val):
     return str(val) if val is not None else None
 
+
 @dataclass
-class Tree():
+class Tree:
     # print a simple version of the CST, probably prefer rich_tree
     def print(self, level=0):
         INDENT_TOKEN = "  "
@@ -40,7 +51,7 @@ class Tree():
         print(indent(level) + camel2snake(type(self).__name__))
         for f in fields(self):
             fobj = getattr(self, f.name)
-            #if isinstance(fobj, Meta):
+            # if isinstance(fobj, Meta):
             #    continue
             if not isinstance(fobj, list):
                 fobj = [fobj]
@@ -90,7 +101,10 @@ class Tree():
             elif isinstance(obj, list):
                 pat = r"(List\[.*\])"
             else:
-                pat = r"\b(" + type(obj).__name__ + r")\b"
+                t = type(obj).__name__
+                if "Path" in t:
+                    t = "Path"
+                pat = r"\b(" + t + r")\b"
             return sub(pat, r"[underline]\1[/underline]", noopt)
 
         # recursively convert a CST node into a rich.tree.Tree
@@ -122,7 +136,11 @@ class Tree():
             elif field_val is None:
                 return [RichTree("[green]None[/green]")]
             else:
-                raise ValueError(f"unknown CST item: {escape(str(field_val))} of type {type(field_val)}")
+                if not isinstance(field_val, HdlParser):
+                    raise ValueError(
+                        f"unknown CST item: {escape(str(field_val))} of type {type(field_val)}"
+                    )
+                return []
 
         if self_meta is None:
             annotated_type = annotate_type(type(self).__name__, self)
@@ -132,13 +150,14 @@ class Tree():
             branch = RichTree(self_meta.name + f" [ {annotated_type} ]")
         for field_meta in fields(self):
             field_val = getattr(self, field_meta.name)
-            #if isinstance(field_val, Meta):
+            # if isinstance(field_val, Meta):
             #    pass
-            #else:
+            # else:
             child = field2tree(field_meta, field_val)
             for c in child:
                 branch.children.append(c)
         return branch
+
 
 @dataclass
 class Net(Tree):
@@ -147,29 +166,36 @@ class Net(Tree):
     type: Type
     default: str | None
 
+
 @dataclass
 class InterfaceNet(Net):
     dir: str
 
+
 @dataclass
 class InterfaceType(Tree):
     name: str
+
 
 @dataclass
 class InterfaceSubprogram(Tree):
     name: str
     default: str | None
 
+
 @dataclass
 class InterfacePackage(Tree):
     name: str
     base_name: str
 
+
 InterfaceElement: TypeAlias = InterfaceNet | InterfaceType | InterfaceSubprogram | InterfacePackage
+
 
 @dataclass
 class Subprogram(Tree):
     name: str
+
 
 @dataclass
 class DeclaredPackage(Tree):
@@ -192,25 +218,42 @@ class DeclaredPackage(Tree):
                 p = param.generic_declaration
                 if isinstance(p, VhdlCst.InterfaceConstantDeclaration):
                     for pid in p.identifier_list:
-                        self.parameters.append(InterfaceNet(str(pid.id), "constant", str(p.subtype_indication), nonestr(p.default), "in"))
+                        self.parameters.append(
+                            InterfaceNet(
+                                str(pid.id),
+                                "constant",
+                                str(p.subtype_indication),
+                                nonestr(p.default),
+                                "in",
+                            )
+                        )
                 elif isinstance(p, VhdlCst.InterfaceIncompleteTypeDeclaration):
                     self.parameters.append(InterfaceType(str(p.identifier)))
                 elif isinstance(p, VhdlCst.InterfaceSubprogramDeclaration):
-                    self.parameters.append(InterfaceSubprogram(str(p.interface_subprogram_specification), nonestr(p.interface_subprogram_default)))
+                    self.parameters.append(
+                        InterfaceSubprogram(
+                            str(p.interface_subprogram_specification),
+                            nonestr(p.interface_subprogram_default),
+                        )
+                    )
                 elif isinstance(p, VhdlCst.InterfacePackageDeclaration):
-                    self.parameters.append(InterfacePackage(str(p.identifier), str(p.uninstantiated_package_name)))
+                    self.parameters.append(
+                        InterfacePackage(str(p.identifier), str(p.uninstantiated_package_name))
+                    )
                 else:
                     raise ValueError(f"bad package generic type {type(p).__name__}")
         for dec in pkg.package_declarative_part:
             dec = dec.item
             if isinstance(dec, VhdlCst.SubprogramDeclaration):
-                self.subprograms.append(Subprogram(dec.specification.specification.designator.format()))
+                self.subprograms.append(
+                    Subprogram(dec.specification.specification.designator.format())
+                )
             elif isinstance(dec, VhdlCst.SubprogramInstantiationDeclaration):
                 self.subprograms.append(Subprogram(dec.identifier))
 
-
     def add_body(self, body: VhdlCst.PackageBody):
         self.has_body = True
+
 
 @dataclass
 class InstancedPackage(Tree):
@@ -219,7 +262,9 @@ class InstancedPackage(Tree):
     declaration: DeclaredPackage = None
     mapping: List[Tuple] = field(default_factory=list)
 
+
 Package: TypeAlias = DeclaredPackage | InstancedPackage
+
 
 @dataclass
 class Module(Tree):
@@ -241,13 +286,28 @@ class Module(Tree):
                 p = param.generic_declaration
                 if isinstance(p, VhdlCst.InterfaceConstantDeclaration):
                     for pid in p.identifier_list:
-                        self.parameters.append(InterfaceNet(str(pid.id), "constant", str(p.subtype_indication), nonestr(p.default), "in"))
+                        self.parameters.append(
+                            InterfaceNet(
+                                str(pid.id),
+                                "constant",
+                                str(p.subtype_indication),
+                                nonestr(p.default),
+                                "in",
+                            )
+                        )
                 elif isinstance(p, VhdlCst.InterfaceIncompleteTypeDeclaration):
                     self.parameters.append(InterfaceType(str(p.identifier)))
                 elif isinstance(p, VhdlCst.InterfaceSubprogramDeclaration):
-                    self.parameters.append(InterfaceSubprogram(str(p.interface_subprogram_specification), nonestr(p.interface_subprogram_default)))
+                    self.parameters.append(
+                        InterfaceSubprogram(
+                            str(p.interface_subprogram_specification),
+                            nonestr(p.interface_subprogram_default),
+                        )
+                    )
                 elif isinstance(p, VhdlCst.InterfacePackageDeclaration):
-                    self.parameters.append(InterfacePackage(str(p.identifier), str(p.uninstantiated_package_name)))
+                    self.parameters.append(
+                        InterfacePackage(str(p.identifier), str(p.uninstantiated_package_name))
+                    )
                 else:
                     raise ValueError(f"bad entity generic type {type(p).__name__}")
         if clause := ent.entity_header.port_clause:
@@ -255,12 +315,21 @@ class Module(Tree):
                 p = port.port_declaration
                 if isinstance(p, VhdlCst.InterfaceSignalDeclaration):
                     for pid in p.identifier_list:
-                        self.ports.append(InterfaceNet(str(pid.id), "signal", str(p.subtype_indication), nonestr(p.default), str(p.mode)))
+                        self.ports.append(
+                            InterfaceNet(
+                                str(pid.id),
+                                "signal",
+                                str(p.subtype_indication),
+                                nonestr(p.default),
+                                str(p.mode),
+                            )
+                        )
                 else:
                     raise ValueError(f"bad entity port type {type(p).__name__}")
 
     def add_arch(self, arch: VhdlCst.ArchitectureBody):
         self.arch_name = arch.identifier
+
 
 @dataclass
 class File(Tree):
@@ -269,20 +338,21 @@ class File(Tree):
     def __hash__(self):
         return self.path.__hash__()
 
+
 @dataclass
 class Library(Tree):
     name: str
     packages: List[Package] = field(default_factory=list)
-    modules:  List[Module] = field(default_factory=list)
+    modules: List[Module] = field(default_factory=list)
 
     def get_module(self, name):
         for mod in self.modules:
-            if mod.name == name:
+            if mod.name.lower() == name.lower():
                 return mod
 
     def get_package(self, name):
         for pkg in self.packages:
-            if pkg.name == name:
+            if pkg.name.lower() == name.lower():
                 return pkg
 
     def add_cst(self, cst):
@@ -290,12 +360,11 @@ class Library(Tree):
         new_mods = []
         for du in cst.design_units:
             ctx = du.context_clause
-            lu = du.library_unit.unit.children[1]
+            lu = du.library_unit.unit.children[0]
             if isinstance(lu, VhdlCst.EntityDeclaration):
                 name = str(lu.identifier)
                 if mod := self.get_module(name):
                     raise ValueError(f"entity {name} already exists")
-                print(f"creating entity {name}")
                 mod = Module(name, {File(cst.path)})
                 mod.add_context(ctx)
                 mod.add_entity(lu)
@@ -305,7 +374,9 @@ class Library(Tree):
                 name = str(lu.entity_name)
                 if mod := self.get_module(name):
                     if mod.arch_name:
-                        raise ValueError(f"entity {name} already has an architecture ({mod.arch_name})")
+                        raise ValueError(
+                            f"entity {name} already has an architecture ({mod.arch_name})"
+                        )
                     mod.add_context(ctx)
                     mod.add_arch(lu)
                 else:
@@ -314,7 +385,6 @@ class Library(Tree):
                 name = str(lu.identifier)
                 if pkg := self.get_package(name):
                     raise ValueError(f"package {name} already exists")
-                print(f"creating package {name}")
                 pkg = DeclaredPackage(name, {File(cst.path)})
                 pkg.add_context(ctx)
                 pkg.add_package(lu)
@@ -335,10 +405,9 @@ class Library(Tree):
                 pkgname = str(lu.uninstantiated_package_name)
                 baselib, basepkg = pkgname.split(".")
                 if pkg := self.get_package(basepkg):
-                    print(f"instantiating package {pkgname} as {inst}")
                     mapping = []
                     if genmap := lu.generic_map_aspect:
-                        for idx,m in enumerate(genmap.association_list):
+                        for idx, m in enumerate(genmap.association_list):
                             formal = str(m.formal) if m.formal else idx
                             actual = str(m.actual)
                             mapping.append((formal, actual))
@@ -346,18 +415,163 @@ class Library(Tree):
                     self.packages.append(newpkg)
                     new_mods.append(newpkg)
                 else:
-                    raise ValueError(f"package {pkgname} does not exist")
+                    raise ValueError(f"package {pkgname} doesn't exist")
             else:
                 print(f"unsupported {type(lu).__name__}")
         return new_mods
 
+
 @dataclass
 class Project(Tree):
-    libraries: List[Library] = field(default_factory=list)
+    ambig: InitVar[bool] = False
+    use_regex: InitVar[bool] = True
+    debug_lark: InitVar[bool] = False
+    add_std: InitVar[bool] = False
+    libraries: List[Library] = field(init=False, default_factory=list)
+    parser: HdlParser = field(init=False)
+
+    def __post_init__(self, ambig: bool, use_regex: bool, debug_lark: bool, add_std: bool):
+        self.parser = HdlParser(ambig, use_regex, debug_lark)
+
+        if add_std:
+            self.add_library("std")
+            cwd = Path(__file__).parent / "std"
+            # for f in ["env.vhdl", "standard.vhdl", "textio.vhdl"]:
+            for f in cwd.glob("*.vhdl"):
+                if "-body" not in f.name:
+                    self.add_file("std", f.as_posix())
+
+            self.add_library("ieee")
+            cwd = Path(__file__).parent / "ieee2008"
+            for f in cwd.glob("*.vhdl"):
+                if "-body" not in f.name:
+                    self.add_file("ieee", f.as_posix())
+
+    def add_file(
+        self, lib: Library | str, file: TextIOBase | Path | str, print_cst=False, debug=False
+    ):
+        if debug:
+            print(f"analyzing {file}", end="", flush=True)
+            prev = time()
+
+        try:
+            cst = self.parser.parse_file(file)
+        except UnexpectedCharacters as e:
+            print()
+            print(f"error at line {e.line}, column {e.column}")
+            print("expected:")
+            print(e.allowed)
+            print("from rules:")
+            print(e.considered_rules)
+        except VisitError as e:
+            print(e)
+            errjson = e.__context__.json()
+            print(dumps(loads(errjson), indent=2))
+
+        if isinstance(lib, Library):
+            lib.add_cst(cst)
+        else:
+            self.get_library(lib).add_cst(cst)
+
+        if debug:
+            lines = file.read_text("latin-1").count("\n")
+            elapsed = time() - prev
+            print(
+                f"\ranalyzed {file} ({lines} lines) in {elapsed:.2f} seconds ({lines/elapsed if elapsed else float('inf'):.2f} lines/sec)"
+            )
+
+        if print_cst:
+            con = Console(emoji=False)
+            con.print(cst.rich_tree())
+
+        return cst
+
+    def add_library(self, name: str) -> Library:
+        for lib in self.libraries:
+            if lib.name.lower() == name.lower():
+                raise ValueError(f"library named {name} already exists")
+        self.libraries.append(Library(name))
+        return self.libraries[-1]
 
     def get_library(self, name: str) -> Library:
         for lib in self.libraries:
-            if lib.name == name:
+            if lib.name.lower() == name.lower():
                 return lib
-        self.libraries.append(Library(name))
-        return self.libraries[-1]
+        raise ValueError(f"no library named {name}")
+
+    def print_simple(self):
+        for lib in self.libraries:
+            if lib.name in ["std", "ieee"]:
+                continue
+            print(f"library {lib.name}")
+            for pkg in lib.packages:
+                inst = None
+                mapping = []
+                if isinstance(pkg, InstancedPackage):
+                    inst = pkg
+                    mapping = pkg.mapping
+                    pkg = pkg.declaration
+                print(
+                    f"\tpackage {(inst.name + ' is ') if inst else ''}{pkg.name} -> {[f.path.as_posix() for f in ((inst.files if inst else set()) | pkg.files)]}"
+                )
+                if params := pkg.parameters:
+                    print(f"\t\tgeneric")
+                    for idx, p in enumerate(params):
+                        try:
+                            default = p.default
+                        except AttributeError:
+                            default = None
+                        for f, a in mapping:
+                            if f == idx or f == p.name:
+                                default = a
+                                break
+                        if isinstance(p, InterfaceNet):
+                            print(
+                                f"\t\t\t{p.name} : {p.type}{(' := ' + default) if default else ''}"
+                            )
+                        elif isinstance(p, InterfaceType):
+                            print(f"\t\t\ttype {p.name}{(' := ' + default) if default else ''}")
+                        elif isinstance(p, InterfaceSubprogram):
+                            print(
+                                f"\t\t\tsubprogram {p.name}{(' := ' + default) if default else ''}"
+                            )
+                        elif isinstance(p, InterfacePackage):
+                            print(
+                                f"\t\t\tpackage {p.name} is {p.base_name}{(' := ' + default) if default else ''}"
+                            )
+                        else:
+                            raise ValueError(f"bad package generic type {type(p).__name__}")
+                if subprograms := pkg.subprograms:
+                    print(f"\t\tsubprogram")
+                    for s in subprograms:
+                        if isinstance(s, Subprogram):
+                            print(f"\t\t\t{s.name}")
+                        else:
+                            raise ValueError(f"bad package subprogram type {type(s).__name__}")
+            for mod in lib.modules:
+                print(
+                    f"\tmodule {mod.name}({mod.arch_name}) -> {[f.path.as_posix() for f in mod.files]}"
+                )
+                if params := mod.parameters:
+                    print(f"\t\tgeneric")
+                    for p in params:
+                        if isinstance(p, InterfaceNet):
+                            print(
+                                f"\t\t\t{p.name} : {p.type} {(':= ' + p.default) if p.default is not None else ''}"
+                            )
+                        elif isinstance(p, InterfaceType):
+                            print(f"\t\t\ttype {p.name}")
+                        elif isinstance(p, InterfaceSubprogram):
+                            print(
+                                f"\t\t\t{p.name} : subprogram {(':= ' + p.default) if p.default is not None else ''}"
+                            )
+                        elif isinstance(p, InterfacePackage):
+                            print(f"\t\t\t{p.name} : package := {p.base_name}")
+                        else:
+                            raise ValueError(f"bad module generic type {type(p).__name__}")
+                if ports := mod.ports:
+                    print(f"\t\tport")
+                    for p in ports:
+                        print(
+                            f"\t\t\t{p.name} : {p.dir} {p.type} {(':= ' + p.default) if p.default is not None else ''}"
+                        )

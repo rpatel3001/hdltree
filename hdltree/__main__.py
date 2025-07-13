@@ -1,4 +1,4 @@
-from hdltree.hdltree import main
+from hdltree.cli import main
 
 if __name__ == "__main__":
     main()

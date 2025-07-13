@@ -3,6 +3,7 @@ from io import TextIOBase
 from pathlib import Path
 from lark import Lark, logger, ast_utils
 from lark_ambig_tools import CountTrees
+from typing import List
 
 from . import VhdlParseTreeTransformers
 from . import VhdlCstTransformer
@@ -20,6 +21,25 @@ def filetype(fpath: Path):
         return "VLOG"
     else:
         return fileext.upper()
+
+
+def collect_files(include: List[Path], exclude: List[Path]):
+    def is_excluded(test: Path):
+        for ex in exclude:
+            if inpath.is_relative_to(ex):
+                return True
+        return False
+
+    files = []
+    for inpath in include:
+        if inpath.is_file() and not is_excluded(inpath):
+            files.append(inpath)
+        elif inpath.is_dir() and not is_excluded(inpath):
+            for ext in vhdl_fileext:
+                for infile in inpath.rglob("*." + ext):
+                    if infile.is_file() and not is_excluded(infile):
+                        files.append(infile)
+    return files
 
 
 def count(tree):

@@ -95,7 +95,7 @@ class _VhdlCstNode(ast_utils.Ast, ast_utils.WithMeta):
                 field_val = getattr(self, field_meta.name)
                 if isinstance(field_val, list):
                     children += field_val
-                else:
+                elif not isinstance(field_val, Meta):
                     children.append(field_val)
                 # if not isinstance(field_val, list) and field_val is not None:
                 #  children.append(field_val)
@@ -361,7 +361,7 @@ class StringLiteral(_VhdlCstNode):
 
 @dataclass
 class Literal(_VhdlCstNode):
-    item: NumericLiteral | StringLiteral | BitStringLiteral
+    item: NumericLiteral | EnumerationLiteral | StringLiteral | BitStringLiteral
 
     def format(self):
         return str(self.item)

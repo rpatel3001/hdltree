@@ -107,7 +107,6 @@ class MakeAmbigUnique(Transformer):
     #    else:
     #        return tree
 
-
     @v_args(tree=True)
     def physical_literal(self, tree):
         units = ["fs", "ps", "ns", "us", "ms", "sec", "min", "hr"]
@@ -116,6 +115,4 @@ class MakeAmbigUnique(Transformer):
             unit = unit.children[0]
         if unit not in units:
             tree.to_delete = True
-            return Discard
-        else:
-            return tree
+        return tree
