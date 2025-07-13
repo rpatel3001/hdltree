@@ -303,23 +303,25 @@ def parse_vhdl(text):
                 kind = 'function'
             name = str(spec.designator)
             parameters = []
-            for param in spec.formal_parameter_list:
-              decl = param.parameter_declaration
-              for id in decl.identifier_list:
-                default = None
-                if decl.default:
-                    default = str(decl.default)
-                if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
-                    ptype = VhdlParameterType(
-                        str(decl.subtype_indication.type_mark),
-                        decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
-                        str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
-                        str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
-                        str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
-                    )
-                else:
-                    ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
-                parameters += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
+            if plist := spec.formal_parameter_list:
+                for param in plist:
+                    decl = param.parameter_declaration
+                    if not isinstance(decl, InterfaceFileDeclaration):
+                        for id in decl.identifier_list:
+                            default = None
+                            if decl.default:
+                                default = str(decl.default)
+                            if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                                ptype = VhdlParameterType(
+                                    str(decl.subtype_indication.type_mark),
+                                    decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                                    str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                                    str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                                    str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                                )
+                            else:
+                                ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                            parameters += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
 
             if kind == 'function':
                 vobj = VhdlFunction(name, cur_package, parameters, str(spec.type_mark))
