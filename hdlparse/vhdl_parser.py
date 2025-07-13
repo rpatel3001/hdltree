@@ -10,10 +10,10 @@ import re
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Set
 
-from hdltree.hdltree import VhdlParser
+from hdltree import Parser
 from hdltree.VhdlCstTransformer import *
 
-parser = VhdlParser()
+parser = Parser.HdlParser()
 
 class VhdlObject:
     """Base class for parsed VHDL objects
@@ -289,12 +289,12 @@ def parse_vhdl(text):
     Returns:
       Parsed objects.
     """
-    cst = parser.parse(text)
+    cst = parser.parse(text, "VHDL")
 
     objects = []
     cur_package = "defaultpkg"
 
-    for node in cst.iter_subtrees_topdown():
+    for node in cst.iter_subtrees():
         if isinstance(node, SubprogramDeclaration):
             spec = node.specification.specification
             if isinstance(spec, ProcedureSpecification):
@@ -332,21 +332,22 @@ def parse_vhdl(text):
                 generics = []
                 for elem in genclause.interface_elements:
                     decl = elem.generic_declaration
-                    for id in decl.identifier_list:
-                        default = None
-                        if decl.default:
-                            default = str(decl.default)
-                        if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
-                            ptype = VhdlParameterType(
-                                str(decl.subtype_indication.type_mark),
-                                decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
-                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
-                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
-                                str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
-                            )
-                        else:
-                            ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
-                        generics += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
+                    if isinstance(decl, InterfaceConstantDeclaration):
+                        for id in decl.identifier_list:
+                            default = None
+                            if decl.default:
+                                default = str(decl.default)
+                            if decl.subtype_indication.constraint and isinstance(decl.subtype_indication.constraint.constraint, ArrayConstraint):
+                                ptype = VhdlParameterType(
+                                    str(decl.subtype_indication.type_mark),
+                                    decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.direction,
+                                    str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.right),
+                                    str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range.left),
+                                    str(decl.subtype_indication.constraint.constraint.index_constraint.discrete_ranges[0].range)
+                                )
+                            else:
+                                ptype = VhdlParameterType(str(decl.subtype_indication.type_mark))
+                            generics += [VhdlParameter(str(id), str(decl.mode) if decl.mode else "in", ptype, default)]
             else:
                 generics = None
 
